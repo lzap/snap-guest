@@ -3,7 +3,10 @@
 # It also works with raw or LVM based images!
 
 usage(){
-  echo "Usage: BASE_IMAGE_NAME TARGET_IMAGE_NAME [MEMORY IN MB] [NO OF CPUS]"
+  echo "Usage: BASE_IMAGE_NAME TARGET_IMAGE_NAME [MEMORY IN MB] [NO OF CPUS] [NETWORK OPTIONS]"
+  echo "Examples:"
+  echo "        $0 fedora-15-base test 1024 2 network=default"
+  echo "        $0 fedora-16-base sixteen 512 1 bridge=eth0"
   echo "Available base images:"
   ls /var/lib/libvirt/images/ | grep base | sed 's/\.img//g'
 }
@@ -12,6 +15,7 @@ SOURCE_NAME=$1
 TARGET_NAME=$2
 MEM=${3:-800}
 CPUS=${4:-1}
+NETWORK=${5:-network=default}
 
 if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
   usage
@@ -53,4 +57,4 @@ umount $TMPDIR
 # -- Image Provisioning ---------
 
 echo "Provisioning guest"
-virt-install --vcpus $CPUS --ram $MEM --import --name $TARGET_NAME --disk $TARGET_IMG,format=qcow2 --vnc --noautoconsole -m "$MAC"
+virt-install --vcpus $CPUS --ram $MEM --import --name $TARGET_NAME --disk $TARGET_IMG,format=qcow2 --vnc --noautoconsole --force --network mac=$MAC,$NETWORK
