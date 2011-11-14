@@ -11,7 +11,7 @@ usage(){
 SOURCE_NAME=$1
 TARGET_NAME=$2
 MEM=${3:-800}
-CPUS=${4:-2}
+CPUS=${4:-1}
 
 if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
   usage
@@ -25,7 +25,10 @@ MAC="52:54:00$(hexdump -e '/1 ":%02x"' -n 3 /dev/urandom)"
 
 if [ -f "$TARGET_IMG" ]; then
   echo "Target image already exists!"
-  exit 1
+  read -p "Are you sure you want to proceed (yes/no)? "
+  [ "$REPLY" != "yes" ] && exit 1
+  read -p "Shutdown and remove host with this name first (yes/no)? "
+  [ "$REPLY" != "yes" ] && virsh destroy $TARGET_NAME; sleep 1s; virsh undefine $TARGET_NAME
 fi
 
 echo "Creating snapshot guest $TARGET_NAME"
