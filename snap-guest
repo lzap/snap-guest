@@ -25,7 +25,7 @@ fi
 IMAGE_DIR=/var/lib/libvirt/images
 SOURCE_IMG=$IMAGE_DIR/$SOURCE_NAME.img
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
-MAC="52:54:00$(hexdump -e '/1 ":%02x"' -n 3 /dev/urandom)"
+MAC="52:54:00$(echo "$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
 
 if [ -f "$TARGET_IMG" ]; then
   echo "Target image already exists!"
