@@ -1,0 +1,53 @@
+#!/bin/bash
+# Requirements: python-virtinst qemu-img libguestfs-mount
+# It also works with raw or LVM based images!
+
+usage(){
+  echo "Usage: BASE_IMAGE_NAME TARGET_IMAGE_NAME [MEMORY IN MB] [NO OF CPUS]"
+  echo "Available base images:"
+  ls /var/lib/libvirt/images/ | grep base | sed 's/\.img//g'
+}
+
+SOURCE_NAME=$1
+TARGET_NAME=$2
+MEM=${3:-800}
+CPUS=${4:-2}
+
+if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
+  usage
+  exit 1
+fi
+
+IMAGE_DIR=/var/lib/libvirt/images
+SOURCE_IMG=$IMAGE_DIR/$SOURCE_NAME.img
+TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
+MAC="52:54:00$(hexdump -e '/1 ":%02x"' -n 3 /dev/urandom)"
+
+if [ -f "$TARGET_IMG" ]; then
+  echo "Target image already exists!"
+  exit 1
+fi
+
+echo "Creating snapshot guest $TARGET_NAME"
+
+# -- Image Creation --------------
+
+echo "Creating snapshot image"
+qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
+
+# -- Image Manipulation ----------
+
+TMPDIR=$(mktemp -d $TARGET_NAME_XXXX)
+echo "Configuring image volume"
+guestmount -a $TARGET_IMG --rw $TMPDIR -i || exit 1
+echo "Setting MAC address"
+sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
+echo "Setting hostname"
+sed -i -e "s/HOSTNAME=.*/HOSTNAME=$TARGET_NAME/" $TMPDIR/etc/sysconfig/network
+sed -i -e "s/$SOURCE_NAME/$TARGET_NAME/" $TMPDIR/etc/hosts
+umount $TMPDIR
+
+# -- Image Provisioning ---------
+
+echo "Provisioning guest"
+virt-install --vcpus $CPUS --ram $MEM --import --name $TARGET_NAME --disk $TARGET_IMG,format=qcow2 --vnc --noautoconsole -m "$MAC"
