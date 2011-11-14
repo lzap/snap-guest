@@ -12,6 +12,16 @@ Features
  * modifies network settings (MAC, hostname) for Fedora/Red Hat distros
  * creates and provisions guest using virt-install
 
+Requirements
+------------
+
+ * bash :-)
+ * sed
+ * python-virtinst
+ * qemu-img
+ * libguestfs-mount
+ * vim (recommended :-)
+
 How it works
 ------------
 
@@ -30,7 +40,7 @@ So if you name the VM fedora-10-base, hostname must be set the same.
 
 The usage is very easy then:
 
-    Usage: BASE_IMAGE TARGET_IMAGE [MEMORY IN MB] [NO OF CPUS] [NETWORK OPTIONS]
+    Usage: BASE_IMAGE TARGET_IMAGE [MEMORY IN MB] [CPUS] [NETWORK OPTIONS]
 
 Examples
 --------
@@ -39,29 +49,31 @@ Examples
 
     /usr/local/bin/snap-guest fedora-16-base sixteen 512 1 bridge=eth0
 
-Snap-guest is a great tool for developing or testing. Provisioning new guest from
-a template is very fast (about 5-10 seconds).
+Snap-guest is a great tool for developing or testing. Provisioning new guest 
+from a template is very fast (about 5-10 seconds).
 
 Network
 -------
 
-The script modifies network settings in /etc/sysconfig directory (hostname and MAC 
-address of the eth0). The MAC address is generated based on the hostname - the same
-hostname always gives the same address. Example:
+The script modifies network settings in /etc/sysconfig directory (hostname and 
+MAC address of the eth0). The MAC address is generated based on the hostname - 
+the same hostname always gives the same address. Example:
 
     hostname a => mac 52:54:00:60:b7:25
     hostname b => mac 52:54:00:3b:5d:5c
     hostname a => mac 52:54:00:60:b7:25 (the same)
 
-This is great for testing - when you provision a box called let's say "test" and
-delete it, once it is provisioned again with the same name, DHCP will assign
-it the very same IP address.
+This is great for testing - when you provision a box called let's say "test" 
+and delete it, once it is provisioned again with the same name, DHCP will 
+assign it the very same IP address.
 
 Credits and license
 -------------------
 
 The script is distributed under public domain.
 
-Original script was written by Red Hat folks, I have slightly modified it, I
-was using it and after few improvements I decided to share it with the world.
+Original script was written by Red Hat folks (Jason Dobies, Shannon Hughes,
+Mike McCune and others), I have slightly modified it, I was using it and after 
+few improvements I decided to share it with the world.
 
+vim: tw=79:fo+=w
