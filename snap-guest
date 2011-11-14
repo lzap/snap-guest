@@ -58,3 +58,4 @@ umount $TMPDIR
 
 echo "Provisioning guest"
 virt-install --vcpus $CPUS --ram $MEM --import --name $TARGET_NAME --disk $TARGET_IMG,format=qcow2 --vnc --noautoconsole --force --network mac=$MAC,$NETWORK
+
