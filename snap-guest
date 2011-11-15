@@ -89,7 +89,7 @@ if [ -f "$TARGET_IMG" ]; then
   read -p "Are you sure you want to proceed (y/[n])? "
   [ "$REPLY" != "y" ] && exit 1
   read -p "Shutdown and remove host with this name first (y/[n])? "
-  [ "$REPLY" != "y" ] && virsh destroy $TARGET_NAME; sleep 1s; virsh undefine $TARGET_NAME
+  [ "$REPLY" != "y" ] && virsh destroy "$TARGET_NAME"; sleep 5s; virsh undefine "$TARGET_NAME"
 fi
 
 echo "Creating snapshot guest $TARGET_NAME"
