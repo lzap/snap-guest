@@ -1,31 +1,89 @@
 #!/bin/bash
-# Requirements: python-virtinst qemu-img libguestfs-mount
-# It also works with raw or LVM based images!
+# Requirements: python-virtinst qemu-img libguestfs-mount sed bash
 
-usage(){
-  echo "Usage: BASE_IMAGE_NAME TARGET_IMAGE_NAME [MEMORY IN MB] [NO OF CPUS] [NETWORK OPTIONS]"
-  echo "Examples:"
-  echo "        $0 fedora-15-base test 1024 2 network=default"
-  echo "        $0 fedora-16-base sixteen 512 1 bridge=eth0"
-  echo "Available base images:"
-  ls /var/lib/libvirt/images/ | grep base | sed 's/\.img//g'
+usage() {
+cat <<USAGE
+usage: $0 options
+
+Simple script for creating copy-on-write QEMU/KVM guests.
+
+OPTIONS:
+  -h             Show this message
+  -l             List avaiable images (with "base" in the name)
+  -a             List all images
+  -b [image]     Base image name (template) - required
+  -t [image]     Target image name (and hostname) - required
+  -n [network]   Network settings (default: "network=default")
+  -m [MB]        Memory (default: 800 MiB)
+  -c [CPUs]      Number of CPUs (default: 1)
+  -p [path]      Images path (default: /var/lib/libvirt/images/)
+  -d [domain]    Domain suffix like "mycompany.com" (default: none)
+
+EXAMPLE:
+
+  $0 -l
+  $0 fedora-17-base test-vm
+  $0 fedora-17-base test-vm2 -n bridge=br0 -d example.com
+  $0 rhel-6-base test-vm -m 2048 -c 4 -p /mnt/data/images
+USAGE
 }
 
-SOURCE_NAME=$1
-TARGET_NAME=$2
-MEM=${3:-800}
-CPUS=${4:-1}
-NETWORK=${5:-network=default}
+SOURCE_NAME=""
+TARGET_NAME=""
+NETWORK="network=default"
+MEM="800"
+CPUS="1"
+IPATH="/var/lib/libvirt/images"
+DOMAIN=""
+
+while getopts "hlab:t:n:m:c:" opt; do
+  case $opt in
+    l)
+      ls "$IPATH" | grep base | sed 's/\.img//g'
+      ;;
+    a)
+      ls "$IPATH" | sed 's/\.img//g'
+      ;;
+    b)
+      SOURCE_NAME="$OPTARG"
+      ;;
+    t)
+      TARGET_NAME="$OPTARG"
+      ;;
+    n)
+      NETWORK="$OPTARG"
+      ;;
+    m)
+      MEM="$OPTARG"
+      ;;
+    c)
+      CPUS="$OPTARG"
+      ;;
+    d)
+      DOMAIN=".$OPTARG"
+      ;;
+    h)
+      usage
+      exit
+      ;;
+    ?)
+      echo "Invalid option: $OPTARG" >&2
+      usage
+      exit
+      ;;
+  esac
+done
 
 if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
   usage
   exit 1
 fi
 
-IMAGE_DIR=/var/lib/libvirt/images
+IMAGE_DIR="$IPATH/images"
 SOURCE_IMG=$IMAGE_DIR/$SOURCE_NAME.img
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
 MAC="52:54:00$(echo "$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
+HOSTNM="$TARGET_NAME$DOMAIN"
 
 if [ -f "$TARGET_IMG" ]; then
   echo "Target image already exists!"
@@ -50,12 +108,23 @@ guestmount -a $TARGET_IMG --rw $TMPDIR -i || exit 1
 echo "Setting MAC address"
 sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
 echo "Setting hostname"
-sed -i -e "s/HOSTNAME=.*/HOSTNAME=$TARGET_NAME/" $TMPDIR/etc/sysconfig/network
-sed -i -e "s/$SOURCE_NAME/$TARGET_NAME/" $TMPDIR/etc/hosts
+sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
+sed -i -e "s/$SOURCE_NAME/$HOSTNM/" $TMPDIR/etc/hosts
 umount $TMPDIR
 
 # -- Image Provisioning ---------
 
-echo "Provisioning guest"
-virt-install --vcpus $CPUS --ram $MEM --import --name $TARGET_NAME --disk $TARGET_IMG,format=qcow2 --vnc --noautoconsole --force --network=$NETWORK,mac=$MAC
+echo "Provisioning guest $TARGET_NAME"
+echo "Hostname: $HOSTNM"
+echo "CPUs:     $CPUS"
+echo "Memory:   $MEM"
+echo "MAC:      $MAC"
+virt-install --vcpus $CPUS \
+  --ram $MEM --import \
+  --name $TARGET_NAME \
+  --disk $TARGET_IMG,format=qcow2 \
+  --vnc --noautoconsole --force \
+  --network=$NETWORK,mac=$MAC
+
+# -- EOF --
 

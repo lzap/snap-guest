@@ -27,7 +27,8 @@ How it works
 
 First of all you need to create base image using any method you want (e.g. 
 virt-manager). It's recommended to use "base" string in the guest name
-(e.g. fedora-10-base or rhel4-base).
+(e.g. fedora-10-base or rhel4-base). The template image format can be qcow2 as 
+well as different one (raw on LVM for example).
 
 Feel free to configure the base image according needs. It's recommended to 
 install few packages like ntpd or acpid. The following blogpost contains more
