@@ -33,16 +33,16 @@ TARGET_NAME=""
 NETWORK="network=default"
 MEM="800"
 CPUS="1"
-IPATH="/var/lib/libvirt/images"
+IMAGE_DIR="/var/lib/libvirt/images"
 DOMAIN=""
 
 while getopts "hlab:t:n:m:c:" opt; do
   case $opt in
     l)
-      ls "$IPATH" | grep base | sed 's/\.img//g'
+      ls "$IMAGE_DIR" | grep base | sed 's/\.img//g'
       ;;
     a)
-      ls "$IPATH" | sed 's/\.img//g'
+      ls "$IMAGE_DIR" | sed 's/\.img//g'
       ;;
     b)
       SOURCE_NAME="$OPTARG"
@@ -79,7 +79,6 @@ if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
   exit 1
 fi
 
-IMAGE_DIR="$IPATH/images"
 SOURCE_IMG=$IMAGE_DIR/$SOURCE_NAME.img
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
 MAC="52:54:00$(echo "$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
