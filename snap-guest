@@ -86,10 +86,10 @@ HOSTNM="$TARGET_NAME$DOMAIN"
 
 if [ -f "$TARGET_IMG" ]; then
   echo "Target image already exists!"
-  read -p "Are you sure you want to proceed (yes/no)? "
-  [ "$REPLY" != "yes" ] && exit 1
-  read -p "Shutdown and remove host with this name first (yes/no)? "
-  [ "$REPLY" != "yes" ] && virsh destroy $TARGET_NAME; sleep 1s; virsh undefine $TARGET_NAME
+  read -p "Are you sure you want to proceed (y/[n])? "
+  [ "$REPLY" != "y" ] && exit 1
+  read -p "Shutdown and remove host with this name first (y/[n])? "
+  [ "$REPLY" != "y" ] && virsh destroy $TARGET_NAME; sleep 1s; virsh undefine $TARGET_NAME
 fi
 
 echo "Creating snapshot guest $TARGET_NAME"
