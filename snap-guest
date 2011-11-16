@@ -18,6 +18,7 @@ OPTIONS:
   -c [CPUs]      Number of CPUs (default: 1)
   -p [path]      Images path (default: /var/lib/libvirt/images/)
   -d [domain]    Domain suffix like "mycompany.com" (default: none)
+  -f             Force creating new guest (no questions)
 
 EXAMPLE:
 
@@ -35,6 +36,7 @@ MEM="800"
 CPUS="1"
 IMAGE_DIR="/var/lib/libvirt/images"
 DOMAIN=""
+FORCE=0
 
 while getopts "hlab:t:n:m:c:" opt; do
   case $opt in
@@ -43,6 +45,9 @@ while getopts "hlab:t:n:m:c:" opt; do
       ;;
     a)
       ls "$IMAGE_DIR" | sed 's/\.img//g'
+      ;;
+    f)
+      FORCE=1
       ;;
     b)
       SOURCE_NAME="$OPTARG"
@@ -86,7 +91,11 @@ HOSTNM="$TARGET_NAME$DOMAIN"
 
 if [ -f "$TARGET_IMG" ]; then
   echo "Target image already exists!"
-  read -p "Shutdown and remove host with this name first (y/[n])? "
+  if [ $FORCE -eq 1 ]; then
+    REPLY="y"
+  else
+    read -p "Shutdown and remove host with this name first (y/[n])? "
+  fi
   [ "$REPLY" != "y" ] && \
     # need to do it twice (sometimes this fail)
     virsh destroy "$TARGET_NAME" 2>/dev/null; sleep 2s; \
