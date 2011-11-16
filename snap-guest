@@ -38,7 +38,7 @@ IMAGE_DIR="/var/lib/libvirt/images"
 DOMAIN=""
 FORCE=0
 
-while getopts "hlafb:t:n:m:c:" opt; do
+while getopts "hlafb:t:n:m:c:d:" opt; do
   case $opt in
     l)
       ls "$IMAGE_DIR" | grep base | sed 's/\.img//g'
