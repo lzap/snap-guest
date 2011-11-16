@@ -119,9 +119,10 @@ echo "Setting MAC address"
 sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
 echo "Setting hostname"
 sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
-# sed it if its there or add it if not
-sed -i -e "s/$SOURCE_NAME/$HOSTNM/" $TMPDIR/etc/hosts || \
-  echo "127.0.0.1 $HOSTNM" >> $TMPDIR/etc/hosts
+# remove existing record safely
+grep $SOURCE_NAME $TMPDIR/etc/hosts && sed -i -e "s/$SOURCE_NAME/localbox/" $TMPDIR/etc/hosts
+# add host and host.domain localhost record there
+echo "127.0.0.1 $TARGET_NAME $HOSTNM" >> $TMPDIR/etc/hosts
 umount $TMPDIR
 
 # -- Image Provisioning ---------
