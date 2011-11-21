@@ -11,6 +11,7 @@ Features
  * generates MAC address out of hostname
  * modifies network settings (MAC, hostname) for Fedora/Red Hat distros
  * creates and provisions guest using virt-install
+ * nice cli interface
 
 Requirements
 ------------
@@ -20,7 +21,7 @@ Requirements
  * python-virtinst
  * qemu-img
  * libguestfs-mount
- * vim (recommended :-)
+ * vim (no, you don't really need it, but it's recommended :-)
 
 How it works
 ------------
@@ -41,14 +42,36 @@ So if you name the VM fedora-10-base, hostname must be set the same.
 
 The usage is very easy then:
 
-    Usage: BASE_IMAGE TARGET_IMAGE [MEMORY IN MB] [CPUS] [NETWORK OPTIONS]
+  usage: ./snap-guest options
+
+  Simple script for creating copy-on-write QEMU/KVM guests.
+
+  OPTIONS:
+    -h             Show this message
+    -l             List avaiable images (with "base" in the name)
+    -a             List all images
+    -b [image]     Base image name (template) - required
+    -t [image]     Target image name (and hostname) - required
+    -n [network]   Network settings (default: "network=default")
+    -m [MB]        Memory (default: 800 MiB)
+    -c [CPUs]      Number of CPUs (default: 1)
+    -p [path]      Images path (default: /var/lib/libvirt/images/)
+    -d [domain]    Domain suffix like "mycompany.com" (default: none)
+    -f             Force creating new guest (no questions)
+
+  EXAMPLE:
+
+    ./snap-guest -l
+    ./snap-guest fedora-17-base test-vm
+    ./snap-guest fedora-17-base test-vm2 -n bridge=br0 -d example.com
+    ./snap-guest rhel-6-base test-vm -m 2048 -c 4 -p /mnt/data/images
 
 Examples
 --------
 
-    /usr/local/bin/snap-guest fedora-15-base test 1024 2 network=default
+    /usr/local/bin/snap-guest -b f15-x64-base -c 4 -m 2048 -t mybox
 
-    /usr/local/bin/snap-guest fedora-16-base sixteen 512 1 bridge=eth0
+    /usr/local/bin/snap-guest -b f15-x64-base -n bridge=br0 -d lan -f -t mybox
 
 Snap-guest is a great tool for developing or testing. Provisioning new guest 
 from a template is very fast (about 5-10 seconds).
