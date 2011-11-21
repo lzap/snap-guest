@@ -42,36 +42,29 @@ So if you name the VM fedora-10-base, hostname must be set the same.
 
 The usage is very easy then:
 
-  usage: ./snap-guest options
+    usage: ./snap-guest options
 
-  Simple script for creating copy-on-write QEMU/KVM guests.
+    Simple script for creating copy-on-write QEMU/KVM guests.
 
-  OPTIONS:
-    -h             Show this message
-    -l             List avaiable images (with "base" in the name)
-    -a             List all images
-    -b [image]     Base image name (template) - required
-    -t [image]     Target image name (and hostname) - required
-    -n [network]   Network settings (default: "network=default")
-    -m [MB]        Memory (default: 800 MiB)
-    -c [CPUs]      Number of CPUs (default: 1)
-    -p [path]      Images path (default: /var/lib/libvirt/images/)
-    -d [domain]    Domain suffix like "mycompany.com" (default: none)
-    -f             Force creating new guest (no questions)
+    OPTIONS:
+      -h             Show this message
+      -l             List avaiable images (with "base" in the name)
+      -a             List all images
+      -b [image]     Base image name (template) - required
+      -t [image]     Target image name (and hostname) - required
+      -n [network]   Network settings (default: "network=default")
+      -m [MB]        Memory (default: 800 MiB)
+      -c [CPUs]      Number of CPUs (default: 1)
+      -p [path]      Images path (default: /var/lib/libvirt/images/)
+      -d [domain]    Domain suffix like "mycompany.com" (default: none)
+      -f             Force creating new guest (no questions)
 
-  EXAMPLE:
+    EXAMPLE:
 
-    ./snap-guest -l
-    ./snap-guest fedora-17-base test-vm
-    ./snap-guest fedora-17-base test-vm2 -n bridge=br0 -d example.com
-    ./snap-guest rhel-6-base test-vm -m 2048 -c 4 -p /mnt/data/images
-
-Examples
---------
-
-    /usr/local/bin/snap-guest -b f15-x64-base -c 4 -m 2048 -t mybox
-
-    /usr/local/bin/snap-guest -b f15-x64-base -n bridge=br0 -d lan -f -t mybox
+      ./snap-guest -l
+      ./snap-guest fedora-17-base test-vm
+      ./snap-guest fedora-17-base test-vm2 -n bridge=br0 -d example.com
+      ./snap-guest rhel-6-base test-vm -m 2048 -c 4 -p /mnt/data/images
 
 Snap-guest is a great tool for developing or testing. Provisioning new guest 
 from a template is very fast (about 5-10 seconds).
