@@ -62,9 +62,10 @@ The usage is very easy then:
     EXAMPLE:
 
       ./snap-guest -l
-      ./snap-guest fedora-17-base test-vm
-      ./snap-guest fedora-17-base test-vm2 -n bridge=br0 -d example.com
-      ./snap-guest rhel-6-base test-vm -m 2048 -c 4 -p /mnt/data/images
+      ./snap-guest -p /mnt/data/images -l
+      ./snap-guest -b fedora-17-base -t test-vm
+      ./snap-guest -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
+      ./snap-guest -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
 
 Snap-guest is a great tool for developing or testing. Provisioning new guest 
 from a template is very fast (about 5-10 seconds).
