@@ -24,9 +24,9 @@ EXAMPLE:
 
   $0 -l
   $0 -p /mnt/data/images -l
-  $0 fedora-17-base test-vm
-  $0 fedora-17-base test-vm2 -n bridge=br0 -d example.com
-  $0 rhel-6-base test-vm -m 2048 -c 4 -p /mnt/data/images
+  $0 -b fedora-17-base -t test-vm
+  $0 -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
+  $0 -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
 USAGE
 }
 
