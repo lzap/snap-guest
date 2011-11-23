@@ -28,8 +28,10 @@ How it works
 
 First of all you need to create base image using any method you want (e.g. 
 virt-manager). It's recommended to use "base" string in the guest name
-(e.g. fedora-10-base or rhel4-base). The template image format can be qcow2 as 
-well as different one (raw on LVM for example).
+(e.g. fedora-10-base or rhel4-base) to differentiate those files (snap-guest
+lists them using -l option), but it is not mandatory (option -a lists them 
+all). The template image format can be qcow2 as well as different one (raw on 
+LVM for example).
 
 Feel free to configure the base image according needs. It's recommended to 
 install few packages like ntpd or acpid. The following blogpost contains more
@@ -69,6 +71,26 @@ The usage is very easy then:
 
 Snap-guest is a great tool for developing or testing. Provisioning new guest 
 from a template is very fast (about 5-10 seconds).
+
+Warning
+-------
+
+There is one **important thing** you need to know. Once you have some guests, 
+you **must not start** a template image, because that would break the "child" 
+guests.
+
+You also **must not** change a template even when the "child" buests are 
+_not_ running. Again, if anything changes in a template, images based on the 
+template will be corrupted. Sooner or later.
+
+Trust me, it can seem to work since there is lot of files in a modern 
+distribution (even a minimal installation). But the probability you corrupt 
+some important files is very high. The template must not change when there are 
+"child" guests - never ever.
+
+The only safe way to change something in a template is to **destroy** all the 
+"child" guests, change it and then re-provision them again. It's not big deal - 
+it is fast, you know.
 
 Network
 -------
