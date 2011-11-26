@@ -1,0 +1,76 @@
+#!/bin/bash
+
+usage() {
+cat <<USAGE
+usage: $0 options
+
+Takes image of an existing machine and creates a base image from it. Then it
+creates new copy-on-write image based on this base image and replaces the
+original file (to save disk space).
+
+It's useful for creating a base image from a machine that was already created
+using the snap-guest tool. The resulting base image is not copy-on-write any
+more and it's independent from the original base.
+
+OPTIONS:
+  -h             Show this message
+  -s [image]     Source image name (and hostname) - required
+  -b [image]     Base image name (template) to be created - required
+
+EXAMPLE:
+
+  # create new image f16-1-base based on f16-05 image
+  $0 -s f16-05 -b f16-1-base
+USAGE
+}
+
+
+IMAGE_DIR="/var/lib/libvirt/images"
+
+while getopts "hb:s:" opt; do
+  case $opt in
+    s)
+      SOURCE_NAME="$OPTARG"
+      ;;
+    b)
+      BASE_NAME="$OPTARG"
+      ;;
+    h)
+      usage
+      exit
+      ;;
+    ?)
+      echo "Invalid option: $OPTARG" >&2
+      usage
+      exit 5
+      ;;
+  esac
+done
+
+if [ -z "$SOURCE_NAME" -o -z "$BASE_NAME" ]; then
+  usage
+  exit 1
+fi
+
+BASE_IMG=$IMAGE_DIR/$BASE_NAME.img
+SOURCE_IMG=$IMAGE_DIR/$SOURCE_NAME.img
+
+if [ -f "$BASE_IMG" ]; then
+  echo "Base image already exists!"
+  exit 2
+fi
+
+if virsh list | grep "$SOURCE_NAME"; then
+  echo "Machine of the source image is running! Stop the machine and try it again."
+  exit 3
+fi
+
+echo "Creating base image based on the source"
+qemu-img convert "$SOURCE_IMG" -O raw "$BASE_IMG" || exit 4
+
+
+echo "Using new image as base for the original machine"
+qemu-img create -f qcow2 -b "$BASE_IMG" "$SOURCE_IMG.new" || exit 5
+
+rm "$SOURCE_IMG"
+mv "$SOURCE_IMG.new" "$SOURCE_IMG"
