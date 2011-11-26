@@ -1,0 +1,111 @@
+#!/usr/bin/ruby
+
+DEFAULT_IMAGES_DIR = "/var/lib/libvirt/images"
+
+def usage
+  <<DOC
+Usage: #{File.basename(__FILE__)} [images_dir]
+
+Prints tree of base-images and their copy-on-write snapshots. Useful for
+determining dependencies between images.
+
+Unless images_dir specified it searches images in '#{DEFAULT_IMAGES_DIR}'.
+DOC
+end
+
+IMAGE_DIR = ARGV[0] || DEFAULT_IMAGES_DIR
+
+unless File.directory?(IMAGE_DIR)
+  puts usage
+end
+
+def qemu_images_hash
+  images_hash = {}
+  Dir.glob(File.join(IMAGE_DIR, "*")) do |file|
+    img_info_str = `qemu-img info "#{file}"`
+    img_info = {}
+    img_info_str.each_line do |line|
+      key, value = line.split(":", 2)
+      img_info[key.strip] = value.chomp.strip
+    end
+    images_hash[img_info["image"]] = img_info
+  end
+  images_hash
+end
+
+def images_tree
+  hierarchy_hash = qemu_images_hash
+  hierarchy_hash.each do |(_, image_info)|
+    if base = image_info["backing file"].to_s[/actual path: (.*)\)$/,1]
+      hierarchy_hash[base]["children"] ||= []
+      hierarchy_hash[base]["children"] << image_info
+      image_info["base"] = hierarchy_hash[base]
+    end
+  end
+
+  hierarchy_hash.delete_if {|k,v| v["base"]}
+  images_hierarchy_to_tree(hierarchy_hash.values)
+end
+
+def images_hierarchy_to_tree(images_hierarchy)
+  tree = {}
+  images_hierarchy.each do |image_info|
+    tree[image_info["image"]] =
+      if children = image_info["children"]
+        images_hierarchy_to_tree(children)
+      else
+        nil
+      end
+  end
+  tree
+end
+
+# Converts tree hash such as:
+#
+#   {"1" => {
+#      "1.1" => {
+#        "1.2.1" => nil},
+#      "1.2" => nil },
+#    "2" => {
+#      "2.1" => {
+#        "2.1.2" => nil }}}
+#
+# into string in a form:
+#   1
+#   ├──1.1
+#   │  └──1.2.1
+#   └──1.2
+#   2
+#   └──2.1
+#      └──2.1.2
+def tree_pretty_print(hash, prefix = [])
+  out = ""
+  hash.each_with_index do |(key, children), index|
+    last = index == (hash.size - 1)
+    unless prefix.empty?
+      bullet_width = 2
+      if last
+        prefix[-1] = "└"
+      else
+        prefix[-1] = "├"
+      end
+    else
+      bullet_width = 0
+    end
+    out << prefix.join << ("─" * bullet_width) << key << "\n"
+    unless prefix.empty?
+      if last
+        prefix[-1] = " "
+      else
+        prefix[-1] = "│"
+      end
+    end
+    if children
+      out << tree_pretty_print(children, prefix + [" "] * bullet_width + ["│"])
+    end
+  end
+  out
+end
+
+puts tree_pretty_print(images_tree)
+
