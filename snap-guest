@@ -148,5 +148,29 @@ virt-install --vcpus $CPUS \
   --vnc --noautoconsole --force \
   --network=$NETWORK,mac=$MAC
 
+
+echo "Waiting for IP"
+i=0
+until [ $i -ge 100 ] || IP_LINE=`cat /var/lib/dnsmasq/dnsmasq.leases | grep $MAC`; do
+  i=$((i + 1))
+  sleep 1
+done
+
+if [[ -n $IP_LINE ]]; then
+  IP=`echo  $IP_LINE | awk '{print $3}'`
+  if ! grep -q "$HOSTNM\$" /etc/hosts; then
+    echo "Writing into /etc/hosts ip: $IP"
+    echo $IP $HOSTNM >> /etc/hosts
+  else
+    echo "Host $HOSTNM already in hosts"
+    OLD_IP=`grep "$HOSTNM\$" /etc/hosts | head -n 1 | awk '{print $1}'`
+    if [[ $IP = $OLD_IP ]]; then
+      echo "and these ip's match"
+    else
+      echo "with different ip: $OLD_IP instead of $IP"
+    fi
+  fi
+fi
+
 # -- EOF --
 
