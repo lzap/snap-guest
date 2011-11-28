@@ -9,13 +9,20 @@ creates new copy-on-write image based on this base image and replaces the
 original file (to save disk space).
 
 It's useful for creating a base image from a machine that was already created
-using the snap-guest tool. The resulting base image is not copy-on-write any
+using the snap-guest tool.
+
+When using with -c convert, the resulting base image is not copy-on-write any
 more and it's independent from the original base.
 
 OPTIONS:
-  -h             Show this message
-  -s [image]     Source image name (and hostname) - required
-  -b [image]     Base image name (template) to be created - required
+  -h                  Show this message
+  -s [image]          Source image name (and hostname) - required
+  -b [image]          Base image name (template) to be created - required
+  -c (rename|convert) Command to use when creating a base image from the
+                      original file. Option rename (default) means the file
+                      is only renamed, convert transforms the source image to
+                      raw format, making it independed from other images.
+  base images.
 
 EXAMPLE:
 
@@ -26,14 +33,18 @@ USAGE
 
 
 IMAGE_DIR="/var/lib/libvirt/images"
+COMMAND="rename"
 
-while getopts "hb:s:" opt; do
+while getopts "hb:s:c:" opt; do
   case $opt in
     s)
       SOURCE_NAME="$OPTARG"
       ;;
     b)
       BASE_NAME="$OPTARG"
+      ;;
+    c)
+      COMMAND="$OPTARG"
       ;;
     h)
       usage
@@ -65,12 +76,26 @@ if virsh list | grep "$SOURCE_NAME"; then
   exit 3
 fi
 
-echo "Creating base image based on the source"
-qemu-img convert "$SOURCE_IMG" -O raw "$BASE_IMG" || exit 4
+case $COMMAND in
+  rename)
+    echo "Renaming the source image"
+    mv "$SOURCE_IMG" "$BASE_IMG" || exit 4
+    ;;
+  convert)
+    echo "Creating base image based on the source"
+    qemu-img convert "$SOURCE_IMG" -O raw "$BASE_IMG" || exit 5
+    ;;
+  *)
+    echo "Supported commands are only rename|convert"
+    exit 1
+    ;;
+  esac
 
 
 echo "Using new image as base for the original machine"
-qemu-img create -f qcow2 -b "$BASE_IMG" "$SOURCE_IMG.new" || exit 5
+qemu-img create -f qcow2 -b "$BASE_IMG" "$SOURCE_IMG.new" || exit 6
 
-rm "$SOURCE_IMG"
+if [[ -e "$SOURCE_IMG" ]]; then
+  rm "$SOURCE_IMG"
+fi
 mv "$SOURCE_IMG.new" "$SOURCE_IMG"
