@@ -110,10 +110,13 @@ assign it the very same IP address.
 Credits and license
 -------------------
 
-The script is distributed under public domain.
+The script is distributed as public domain.
 
 Original script was written by Red Hat folks (Jason Dobies, Shannon Hughes,
 Mike McCune and others), I have slightly modified it, I was using it and after 
 few improvements I decided to share it with the world.
+
+Special thanks to all who improve this set of scripts. See AUTHORS for full 
+list.
 
 vim: tw=79:fo+=w
