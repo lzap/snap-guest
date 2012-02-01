@@ -100,7 +100,7 @@ fi
 
 SOURCE_IMG=$IMAGE_DIR/$SOURCE_NAME.img
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
-MAC="52:54:00$(echo "$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
+MAC="52:54:00$(echo "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
 HOSTNM="$TARGET_NAME$DOMAIN"
 
 if [ -f "$TARGET_IMG" ]; then
