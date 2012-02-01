@@ -167,7 +167,7 @@ if [ $ADD_IP -eq 1 ]; then
     IP=`echo  $IP_LINE | awk '{print $3}'`
     if ! grep -q "$HOSTNM\$" /etc/hosts; then
       echo "Writing into /etc/hosts ip: $IP"
-      echo $IP $HOSTNM >> /etc/hosts
+      echo "$IP $HOSTNM $TARGET_NAME" >> /etc/hosts
     else
       echo "Host $HOSTNM already in hosts"
       OLD_IP=`grep "$HOSTNM\$" /etc/hosts | head -n 1 | awk '{print $1}'`
