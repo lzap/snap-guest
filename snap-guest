@@ -149,7 +149,7 @@ echo "MAC:      $MAC"
 virt-install --vcpus $CPUS \
   --ram $MEM --import \
   --name $TARGET_NAME \
-  --disk $TARGET_IMG,format=qcow2 \
+  --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2, \
   --vnc --noautoconsole --force \
   --network=$NETWORK,mac=$MAC
 
