@@ -23,6 +23,13 @@ Requirements
  * libguestfs-mount
  * vim (no, you don't really need it, but it's recommended :-)
 
+Installation
+------------
+
+ * yum -y install bash sed python-virtinst qemu-img libguestfs-mount
+ * git clone git://github.com/lzap/snap-guest.git
+ * sudo ln -s /usr/local/bin/snap-guest $PWD/snap-guest/snap-guest
+
 How it works
 ------------
 
@@ -105,7 +112,13 @@ the same hostname always gives the same address. Example:
 
 This is great for testing - when you provision a box called let's say "test" 
 and delete it, once it is provisioned again with the same name, DHCP will 
-assign it the very same IP address.
+assign it the very same IP address. You can keep hostnames and IPs in the 
+/etc/hosts file and if you won't be shut down your guests for longer periods, 
+IPs never change.
+
+Additionally, if you use snap-guest on the same host where KVM is running, 
+there is a flag that adds entries to your /etc/hosts automatically. See help 
+section for more details.
 
 Credits and license
 -------------------
