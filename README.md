@@ -53,7 +53,10 @@ The usage is very easy then:
 
     usage: ./snap-guest options
 
-    Simple script for creating copy-on-write QEMU/KVM guests.
+    Simple script for creating copy-on-write QEMU/KVM guests. For the base image
+    install Fedora or RHEL (compatible), install acpid and ntpd or similar, do not
+    make any swap partition (use -s option), make sure the hostname is the same
+    as the vm name and it has "base" in it. Example: rhel-6-base.
 
     OPTIONS:
       -h             Show this message
@@ -67,12 +70,14 @@ The usage is very easy then:
       -p [path]      Images path (default: /var/lib/libvirt/images/)
       -d [domain]    Domain suffix like "mycompany.com" (default: none)
       -f             Force creating new guest (no questions)
+      -w             Add IP address to /etc/hosts (works only with NAT)
+      -s             Swap size (in MB) that is appeded as /dev/sdb to fstab
 
     EXAMPLE:
 
       ./snap-guest -l
       ./snap-guest -p /mnt/data/images -l
-      ./snap-guest -b fedora-17-base -t test-vm
+      ./snap-guest -b fedora-17-base -t test-vm -s 4098
       ./snap-guest -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
       ./snap-guest -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
 
