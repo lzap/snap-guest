@@ -146,7 +146,7 @@ sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
 grep $SOURCE_NAME $TMPDIR/etc/hosts && sed -i -e "s/$SOURCE_NAME/localbox/" $TMPDIR/etc/hosts
 # add host and host.domain localhost record there
 echo "127.0.0.1 $TARGET_NAME $HOSTNM" >> $TMPDIR/etc/hosts
-if [ $SWAP -gt O ]; then
+if [ $SWAP -gt 0 ]; then
   # add swap file
   echo '/dev/vdb none swap swap 0 0' >> $TMPDIR/etc/fstab
 fi
