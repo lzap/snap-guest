@@ -17,6 +17,7 @@ OPTIONS:
   -b [image]     Base image name (template) - required
   -t [image]     Target image name (and hostname) - required
   -n [network]   Network settings (default: "network=default")
+  -k [network2]  Second network NIC settings (none by default)
   -m [MB]        Memory (default: 800 MiB)
   -c [CPUs]      Number of CPUs (default: 1)
   -p [path]      Images path (default: /var/lib/libvirt/images/)
@@ -38,6 +39,7 @@ USAGE
 SOURCE_NAME=""
 TARGET_NAME=""
 NETWORK="network=default"
+NETWORK2=""
 MEM="800"
 SWAP=0
 CPUS="1"
@@ -48,7 +50,7 @@ LIST=0
 LIST_ALL=0
 ADD_IP=0
 
-while getopts "hlafwb:t:n:m:c:d:p:s:" opt; do
+while getopts "hlafwb:t:n:m:c:d:p:s:k:" opt; do
   case $opt in
     l)
       LIST=1
@@ -73,6 +75,9 @@ while getopts "hlafwb:t:n:m:c:d:p:s:" opt; do
       ;;
     n)
       NETWORK="$OPTARG"
+      ;;
+    k)
+      NETWORK2="--network=$OPTARG"
       ;;
     m)
       MEM="$OPTARG"
@@ -175,7 +180,8 @@ virt-install --vcpus $CPUS \
   --name $TARGET_NAME \
   --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP \
   --vnc --noautoconsole --force \
-  --network=$NETWORK,mac=$MAC
+  --network=$NETWORK,mac=$MAC \
+  $NETWORK2
 
 # -- IP Determining -------------
 
