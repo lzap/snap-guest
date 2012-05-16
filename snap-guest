@@ -117,6 +117,11 @@ TARGET_IMG_SWAP=$IMAGE_DIR/$TARGET_NAME-swap.img
 MAC="52:54:00$(echo "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
 HOSTNM="$TARGET_NAME$DOMAIN"
 
+if [ ! -f "$SOURCE_IMG" ]; then
+  echo "Base image $SOURCE_IMG not found!"
+  exit 1
+fi
+
 if [ -f "$TARGET_IMG" ]; then
   echo "Target image already exists!"
   if [ $FORCE -eq 1 ]; then
