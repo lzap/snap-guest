@@ -168,8 +168,8 @@ if [ $SWAP -gt 0 ]; then
 fi
 # prepare firstboot command
 if [ ! -z "$COMMAND" ]; then
-  echo "pushd /root\n$COMMAND\npopd" > $TMPDIR/root/firstboot.sh
-  echo "\n# snap-guest\nbash -x /root/firstboot.sh >/root/firstboot.log 2>&1" >> $TMPDIR/etc/rc.local
+  echo -e "pushd /root\n$COMMAND\npopd" > $TMPDIR/root/firstboot.sh
+  echo -e "\n# snap-guest\nbash -x /root/firstboot.sh >/root/firstboot.log 2>&1" >> $TMPDIR/etc/rc.local
   chmod +x $TMPDIR/etc/rc.local
 fi
 umount $TMPDIR && rmdir $TMPDIR
