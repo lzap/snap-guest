@@ -25,6 +25,8 @@ OPTIONS:
   -f             Force creating new guest (no questions)
   -w             Add IP address to /etc/hosts (works only with NAT)
   -s             Swap size (in MB) that is appeded as /dev/sdb to fstab
+  -1 [command]   Command to execute during first boot in /root dir
+                 (logfile available in /root/firstboot.log)
 
 EXAMPLE:
 
@@ -49,6 +51,7 @@ FORCE=0
 LIST=0
 LIST_ALL=0
 ADD_IP=0
+COMMAND=""
 
 while getopts "hlafwb:t:n:m:c:d:p:s:k:" opt; do
   case $opt in
@@ -90,6 +93,9 @@ while getopts "hlafwb:t:n:m:c:d:p:s:k:" opt; do
       ;;
     s)
       SWAP="$OPTARG"
+      ;;
+    1)
+      COMMAND="$OPTARG"
       ;;
     h)
       usage
@@ -159,6 +165,12 @@ echo "127.0.0.1 $TARGET_NAME $HOSTNM" >> $TMPDIR/etc/hosts
 if [ $SWAP -gt 0 ]; then
   # add swap file
   echo '/dev/vdb none swap swap 0 0' >> $TMPDIR/etc/fstab
+fi
+# prepare firstboot command
+if [ ! -z "$COMMAND" ]; then
+  echo "pushd /root\n$COMMAND\npopd" > $TMPDIR/root/firstboot.sh
+  echo "\n# snap-guest\nbash -x /root/firstboot.sh >/root/firstboot.log 2>&1" >> $TMPDIR/etc/rc.local
+  chmod +x $TMPDIR/etc/rc.local
 fi
 umount $TMPDIR && rmdir $TMPDIR
 

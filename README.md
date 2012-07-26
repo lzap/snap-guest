@@ -72,6 +72,8 @@ The usage is very easy then:
       -f             Force creating new guest (no questions)
       -w             Add IP address to /etc/hosts (works only with NAT)
       -s             Swap size (in MB) that is appeded as /dev/sdb to fstab
+      -1 [command]   Command to execute during first boot in /root dir
+                     (logfile available in /root/firstboot.log)
 
     EXAMPLE:
 
