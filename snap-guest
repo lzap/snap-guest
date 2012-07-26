@@ -53,7 +53,7 @@ LIST_ALL=0
 ADD_IP=0
 COMMAND=""
 
-while getopts "hlafwb:t:n:m:c:d:p:s:k:" opt; do
+while getopts "hlafwb:t:n:m:c:d:p:s:k:1:" opt; do
   case $opt in
     l)
       LIST=1
