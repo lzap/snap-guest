@@ -166,10 +166,11 @@ if [ $SWAP -gt 0 ]; then
   # add swap file
   echo '/dev/vdb none swap swap 0 0' >> $TMPDIR/etc/fstab
 fi
-# prepare firstboot command
+# prepare firstboot command and tt "watch progress" alias
 if [ ! -z "$COMMAND" ]; then
   echo -e "pushd /root\n$COMMAND\npopd" > $TMPDIR/root/firstboot.sh
   echo -e "\n# snap-guest\nbash -x /root/firstboot.sh >/root/firstboot.log 2>&1" >> $TMPDIR/etc/rc.local
+  echo -e "\n# snap-guest\nalias tt='tail -f -n200 /root/firstboot.log" >> $TMPDIR/root/.bashrc
   chmod +x $TMPDIR/etc/rc.local
 fi
 umount $TMPDIR && rmdir $TMPDIR
