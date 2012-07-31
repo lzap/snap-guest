@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+# encoding: UTF-8
 
 DEFAULT_IMAGES_DIR = "/var/lib/libvirt/images"
 
