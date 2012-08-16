@@ -127,6 +127,19 @@ Additionally, if you use snap-guest on the same host where KVM is running,
 there is a flag that adds entries to your /etc/hosts automatically. See help 
 section for more details.
 
+Recommended disc layout
+-----------------------
+
+Since snap-guest does not support LVM, you have to rely on the formatted 
+partition. It is recommended to use separate dedicated partition for 
+snap-guest. I am happy with ext4 with extent option enabled and bigger block 
+size. Something like:
+
+    # pvdisplay
+    # lvdisplay
+    # lvcreate -L 140G -n lv_images vg_myhost
+    # mkfs.ext4 -b 4096 -O extent /dev/mapper/vg_myhost-lv_images
+
 Credits and license
 -------------------
 
