@@ -20,7 +20,8 @@ OPTIONS:
   -k [network2]  Second network NIC settings (none by default)
   -m [MB]        Memory (default: 800 MiB)
   -c [CPUs]      Number of CPUs (default: 1)
-  -p [path]      Images path (default: /var/lib/libvirt/images/)
+  -p [path]      Target images path (default: /var/lib/libvirt/images/)
+  -e [path]      Base images path (default: /var/lib/libvirt/images/)
   -d [domain]    Domain suffix like "mycompany.com" (default: none)
   -f             Force creating new guest (no questions)
   -w             Add IP address to /etc/hosts (works only with NAT)
@@ -46,6 +47,7 @@ MEM="800"
 SWAP=0
 CPUS="1"
 IMAGE_DIR="/var/lib/libvirt/images"
+BASE_IMAGE_DIR="/var/lib/libvirt/images"
 DOMAIN=""
 FORCE=0
 LIST=0
@@ -53,7 +55,7 @@ LIST_ALL=0
 ADD_IP=0
 COMMAND=""
 
-while getopts "hlafwb:t:n:m:c:d:p:s:k:1:" opt; do
+while getopts "hlafwb:t:n:m:c:d:p:s:k:1:e:" opt; do
   case $opt in
     l)
       LIST=1
@@ -69,6 +71,9 @@ while getopts "hlafwb:t:n:m:c:d:p:s:k:1:" opt; do
       ;;
     p)
       IMAGE_DIR="$OPTARG"
+      ;;
+    e)
+      BASE_IMAGE_DIR="$OPTARG"
       ;;
     b)
       SOURCE_NAME="$OPTARG"
@@ -109,15 +114,15 @@ while getopts "hlafwb:t:n:m:c:d:p:s:k:1:" opt; do
   esac
 done
 
-[ $LIST -eq 1 ] && ls "$IMAGE_DIR" | grep '\.img' | grep base | sed 's/\.img//g' && exit 0
-[ $LIST_ALL -eq 1 ] && ls "$IMAGE_DIR" | grep '\.img' | sed 's/\.img//g' && exit 0
+[ $LIST -eq 1 ] && ls "$BASE_IMAGE_DIR" | grep '\.img' | grep base | sed 's/\.img//g' && exit 0
+[ $LIST_ALL -eq 1 ] && ls "$BASE_IMAGE_DIR" | grep '\.img' | sed 's/\.img//g' && exit 0
 
 if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
   usage
   exit 1
 fi
 
-SOURCE_IMG=$IMAGE_DIR/$SOURCE_NAME.img
+SOURCE_IMG=$BASE_IMAGE_DIR/$SOURCE_NAME.img
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
 TARGET_IMG_SWAP=$IMAGE_DIR/$TARGET_NAME-swap.img
 MAC="52:54:00$(echo "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
