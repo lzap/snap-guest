@@ -1,4 +1,3 @@
-
 Quick provision script snap-guest for QEMU/KVM
 ==============================================
 
@@ -28,7 +27,7 @@ Installation
 
  * yum -y install bash sed python-virtinst qemu-img libguestfs-mount
  * git clone git://github.com/lzap/snap-guest.git
- * sudo ln -s /usr/local/bin/snap-guest $PWD/snap-guest/snap-guest
+ * sudo ln -s $PWD/snap-guest/snap-guest /usr/local/bin/snap-guest
 
 How it works
 ------------
@@ -40,9 +39,9 @@ lists them using -l option), but it is not mandatory (option -a lists them
 all). The template image format can be qcow2 as well as different one (raw on 
 LVM for example).
 
-Feel free to configure the base image according needs. It's recommended to 
-install few packages like ntpd or acpid. The following blogpost contains more
-information regarding configuring base (or "template") guest:
+Feel free to configure the base image according to your needs. It's recommended
+to install a few packages like ntpd or acpid. The following blog post contains
+more information about configuring base (or "template") guest:
 
 http://lukas.zapletalovi.com/2011/08/configure-red-hat-or-fedora-as-guest.html
 
@@ -83,8 +82,8 @@ The usage is very easy then:
       ./snap-guest -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
       ./snap-guest -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
 
-Snap-guest is a great tool for developing or testing. Provisioning new guest 
-from a template is very fast (about 5-10 seconds).
+Snap-guest is a great tool for developing or testing. Provisioning a new
+guest  from a template is very fast (about 5-10 seconds).
 
 Warning
 -------
@@ -93,7 +92,7 @@ There is one **important thing** you need to know. Once you have some guests,
 you **must not start** a template image, because that would break the "child" 
 guests.
 
-You also **must not** change a template even when the "child" buests are 
+You also **must not** change a template even when the "child" guests are 
 _not_ running. Again, if anything changes in a template, images based on the 
 template will be corrupted. Sooner or later.
 
@@ -127,13 +126,13 @@ Additionally, if you use snap-guest on the same host where KVM is running,
 there is a flag that adds entries to your /etc/hosts automatically. See help 
 section for more details.
 
-Recommended disc layout
+Recommended disk layout
 -----------------------
 
 Since snap-guest does not support LVM, you have to rely on the formatted 
 partition. It is recommended to use separate dedicated partition for 
-snap-guest. I am happy with ext4 with extent option enabled and bigger block 
-size. Something like:
+snap-guest. I am happy with ext4 using the extent option enabled and a
+bigger block size. Something like:
 
     # pvdisplay
     # lvdisplay
