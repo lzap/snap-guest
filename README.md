@@ -3,12 +3,15 @@ Quick provision script snap-guest for QEMU/KVM
 
 Snap-guest is a simple script for creating copy-on-write QEMU/KVM guests.
 
+Upstream site is at http://github.com/lzap/snap-guest
+
 Features
 --------
 
  * creates qcow2 image based on different one
  * generates MAC address out of hostname
  * modifies network settings (MAC, hostname) for Fedora/Red Hat distros
+ * disables fsck check during boot (qcow2 images can have lost inodes)
  * creates and provisions guest using virt-install
  * nice cli interface
 
