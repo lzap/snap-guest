@@ -10,6 +10,9 @@ install Fedora or RHEL (compatible), install acpid and ntpd or similar, do not
 make any swap partition (use -s option), make sure the hostname is the same
 as the vm name and it has "base" in it. Example: rhel-6-base.
 
+WARNING: This script is for development and testing purposes, it is NOT
+recommended to provision production systems with it. You have been warned!
+
 OPTIONS:
   -h             Show this message
   -l             List avaiable images (with "base" in the name)
@@ -159,6 +162,8 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 TMPDIR=$(mktemp -d $TARGET_NAME_XXXX)
 echo "Configuring image volume"
 guestmount -a $TARGET_IMG --rw $TMPDIR -i || exit 1
+echo "Disabling fsck startup check for all volumes"
+sed -i 's/[0-9]$/0/g' $TMPDIR/etc/fstab
 echo "Setting MAC address"
 sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
 echo "Setting hostname"
