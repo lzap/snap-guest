@@ -43,8 +43,9 @@ all). The template image format can be qcow2 as well as different one (raw on
 LVM for example).
 
 Feel free to configure the base image according to your needs. It's recommended
-to install a few packages like ntpd or acpid. The following blog post contains
-more information about configuring base (or "template") guest:
+to install a few packages like ntpd or acpid. Make sure network is also on when
+switching off NetworkManager. The following blog post contains more information 
+about configuring base (or "template") guest:
 
 http://lukas.zapletalovi.com/2011/08/configure-red-hat-or-fedora-as-guest.html
 
