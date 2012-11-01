@@ -160,22 +160,32 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 # -- Image Manipulation ----------
 
 TMPDIR=$(mktemp -d $TARGET_NAME_XXXX)
+
 echo "Configuring image volume"
 guestmount -a $TARGET_IMG --rw $TMPDIR -i || exit 1
+
 echo "Disabling fsck startup check for all volumes"
 sed -i 's/[0-9]$/0/g' $TMPDIR/etc/fstab
+
 echo "Setting MAC address"
 sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
+
 echo "Setting hostname"
 sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
-# remove existing record safely
-grep $SOURCE_NAME $TMPDIR/etc/hosts && sed -i -e "s/$SOURCE_NAME/localbox/" $TMPDIR/etc/hosts
+
+echo "Configuring message of the day"
+echo -e "\n\nSnap-guest box from $BASE on $(date)\n\n" >> $TMPDIR/etc/motd
+
 # add host and host.domain localhost record there
+grep $SOURCE_NAME $TMPDIR/etc/hosts && sed -i -e "s/$SOURCE_NAME/localbox/" $TMPDIR/etc/hosts
 echo "127.0.0.1 $TARGET_NAME $HOSTNM" >> $TMPDIR/etc/hosts
+
+# mount swap partition
 if [ $SWAP -gt 0 ]; then
   # add swap file
   echo '/dev/vdb none swap swap 0 0' >> $TMPDIR/etc/fstab
 fi
+
 # prepare firstboot command and tt "watch progress" alias
 if [ ! -z "$COMMAND" ]; then
   echo -e "pushd /root\n$COMMAND\npopd" > $TMPDIR/root/firstboot.sh
@@ -183,6 +193,7 @@ if [ ! -z "$COMMAND" ]; then
   echo -e "\n# snap-guest\nalias tt='tail -f -n200 /root/firstboot.log'\nalias ttr='screen -rd'" >> $TMPDIR/root/.bashrc
   chmod +x $TMPDIR/etc/rc.d/rc.local
 fi
+
 umount $TMPDIR && rmdir $TMPDIR
 
 # -- Swap Creation --------------
