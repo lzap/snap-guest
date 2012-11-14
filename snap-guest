@@ -190,7 +190,7 @@ fi
 if [ ! -z "$COMMAND" ]; then
   echo -e "pushd /root\n$COMMAND\npopd" > $TMPDIR/root/firstboot.sh
   echo -e "#!/bin/bash\n/usr/bin/screen -d -m /bin/bash -c 'bash -x /root/firstboot.sh 2>&1 | /usr/bin/tee /root/firstboot.log'" >> $TMPDIR/etc/rc.d/rc.local
-  echo -e "\n# snap-guest\nalias tt='tail -f -n200 /root/firstboot.log'\nalias ttr='screen -rd'" >> $TMPDIR/root/.bashrc
+  echo -e "\n# snap-guest\nalias tt='tail -f -n500 /root/firstboot.log'\nalias ttr='screen -rd'" >> $TMPDIR/root/.bashrc
   chmod +x $TMPDIR/etc/rc.d/rc.local
 fi
 
