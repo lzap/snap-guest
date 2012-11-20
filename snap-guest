@@ -167,11 +167,17 @@ guestmount -a $TARGET_IMG --rw $TMPDIR -i || exit 1
 echo "Disabling fsck startup check for all volumes"
 sed -i 's/[0-9]$/0/g' $TMPDIR/etc/fstab
 
-echo "Setting MAC address"
-sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
+if [ -f $TMPDIR/etc/debian_version ]; then
+    echo "Setting hostname"
+    sed -i -e "1 c\ $HOSTNM" $TMPDIR/etc/hostname
 
-echo "Setting hostname"
-sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
+elif [ -f $TMPDIR/etc/redhat-release -o -f $TMPDIR/etc/fedora-release ]; then
+    echo "Setting MAC address"
+    sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
+
+    echo "Setting hostname"
+    sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
+fi
 
 echo "Configuring message of the day"
 echo -e "\n\nSnap-guest box from $BASE on $(date)\n\n" >> $TMPDIR/etc/motd
