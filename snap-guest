@@ -10,6 +10,10 @@ install Fedora or RHEL (compatible), install acpid and ntpd or similar, do not
 make any swap partition (use -s option), make sure the hostname is the same
 as the vm name and it has "base" in it. Example: rhel-6-base.
 
+You can have more versions of the base image e.g. rhel-6-base-1,
+rhel-6-base-2 etc. If you want snap a guest from rhel-6-base, the latest version
+(a version with highest suffix number) will be used.
+
 WARNING: This script is for development and testing purposes, it is NOT
 recommended to provision production systems with it. You have been warned!
 
@@ -125,7 +129,7 @@ if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
   exit 1
 fi
 
-SOURCE_IMG=$BASE_IMAGE_DIR/$SOURCE_NAME.img
+SOURCE_IMG=$(ls -v1 $BASE_IMAGE_DIR/${SOURCE_NAME}*.img | tail -n1)
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
 TARGET_IMG_SWAP=$IMAGE_DIR/$TARGET_NAME-swap.img
 MAC="52:54:00$(echo "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
