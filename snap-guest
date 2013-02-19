@@ -181,7 +181,7 @@ echo "127.0.0.1 $TARGET_NAME $HOSTNM" >> $TMPDIR/etc/hosts
 
 # this must be set for Fedora 18+ (more info in hostnamectl)
 echo "Setting hostname in /etc/hostname"
-sed -i -e "1 c\ $HOSTNM" $TMPDIR/etc/hostname
+[ -f $TMPDIR/etc/hostname ] && sed -i -e "1 c\ $HOSTNM" $TMPDIR/etc/hostname
 
 # dedicated configuration for various distributions
 if [ -f $TMPDIR/etc/debian_version ]; then
