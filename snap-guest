@@ -171,28 +171,36 @@ guestmount -a $TARGET_IMG --rw $TMPDIR -i || exit 1
 echo "Disabling fsck startup check for all volumes"
 sed -i 's/[0-9]$/0/g' $TMPDIR/etc/fstab
 
-if [ -f $TMPDIR/etc/debian_version ]; then
-    echo "Setting hostname"
-    sed -i -e "1 c\ $HOSTNM" $TMPDIR/etc/hostname
-
-elif [ -f $TMPDIR/etc/redhat-release -o -f $TMPDIR/etc/fedora-release ]; then
-    echo "Setting MAC address"
-    sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
-
-    echo "Setting hostname"
-    if [ grep HOSTNAME $TMPDIR/etc/sysconfig/network 2>/dev/null ]; then
-      sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
-    else
-      echo -e "\n\n# added by snap-guest\nHOSTNAME=$HOSTNM" >> $TMPDIR/etc/sysconfig/network
-    fi
-fi
-
 echo "Configuring message of the day"
 echo -e "\n\nSnap-guest box from $BASE on $(date)\n\n" >> $TMPDIR/etc/motd
 
 # add host and host.domain localhost record there
+echo "Configuring /etc/hosts file"
 grep $SOURCE_NAME $TMPDIR/etc/hosts && sed -i -e "s/$SOURCE_NAME/localbox/" $TMPDIR/etc/hosts
 echo "127.0.0.1 $TARGET_NAME $HOSTNM" >> $TMPDIR/etc/hosts
+
+# this must be set for Fedora 18+ (more info in hostnamectl)
+echo "Setting hostname in /etc/hostname"
+sed -i -e "1 c\ $HOSTNM" $TMPDIR/etc/hostname
+
+# dedicated configuration for various distributions
+if [ -f $TMPDIR/etc/debian_version ]; then
+  echo "Setting up for Debian"
+
+  # N/A
+elif [ -f $TMPDIR/etc/redhat-release -o -f $TMPDIR/etc/fedora-release ]; then
+  echo "Setting up for Fedora / RHEL"
+
+  echo "Setting MAC address"
+  sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
+
+  echo "Setting hostname for Fedora (pre-18)" 
+  if [ grep HOSTNAME $TMPDIR/etc/sysconfig/network 2>/dev/null ]; then
+    sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
+  else
+    echo -e "\n\n# added by snap-guest\nHOSTNAME=$HOSTNM" >> $TMPDIR/etc/sysconfig/network
+  fi
+fi
 
 # mount swap partition
 if [ $SWAP -gt 0 ]; then
