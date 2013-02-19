@@ -180,7 +180,11 @@ elif [ -f $TMPDIR/etc/redhat-release -o -f $TMPDIR/etc/fedora-release ]; then
     sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
 
     echo "Setting hostname"
-    sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
+    if [ grep HOSTNAME $TMPDIR/etc/sysconfig/network 2>/dev/null ]; then
+      sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
+    else
+      echo -e "\n\n# added by snap-guest\nHOSTNAME=$HOSTNM" >> $TMPDIR/etc/sysconfig/network
+    fi
 fi
 
 echo "Configuring message of the day"

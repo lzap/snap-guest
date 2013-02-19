@@ -49,7 +49,31 @@ about configuring base (or "template") guest:
 
 http://lukas.zapletalovi.com/2011/08/configure-red-hat-or-fedora-as-guest.html
 
-The only requirement is the hostname - it must be same as the base guest name.
+I also recommend to configure serial console for both terminal and grub. There
+is a simple way to do that, for example for Fedora you need to do this:
+
+    cat >> /etc/default/grub <<'EOF'
+    GRUB_TIMEOUT=1
+    GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX text console=tty0 console=ttyS0,115200n8"
+    GRUB_TERMINAL=serial
+    GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"
+    EOF
+    grub2-mkconfig -o /boot/grub2/grub.cfg
+
+Then it is possible to connect to the console with:
+
+    virsh console guestname
+
+There is a gist with several other extra commands from the above blog post:
+https://gist.github.com/lzap/4984838
+
+To use it do this:
+
+    # \curl -L https://gist.github.com/lzap/4984838/raw | bash -xs
+
+*Important note*
+
+The only requirement is the *hostname* - it must be same as the base guest name.
 So if you name the VM fedora-10-base, hostname must be set the same.
 
 The usage is very easy then:
