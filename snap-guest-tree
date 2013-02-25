@@ -37,7 +37,7 @@ end
 def images_tree
   hierarchy_hash = qemu_images_hash
   hierarchy_hash.each do |(_, image_info)|
-    if base = image_info["backing file"].to_s[/actual path: (.*)\)$/,1]
+    if base = image_info["backing file"].to_s[/actual path: (.*)\)$/,1] || image_info["backing file"]
       hierarchy_hash[base]["children"] ||= []
       hierarchy_hash[base]["children"] << image_info
       image_info["base"] = hierarchy_hash[base]
