@@ -249,7 +249,7 @@ virt-install --vcpus $CPUS \
 if [ $ADD_IP -eq 1 ]; then
   echo "Waiting for IP"
   i=0
-  until [ $i -ge 100 ] || IP_LINE=`cat /var/lib/libvirt/dnsmasq/default.leases /var/lib/dnsmasq/dnsmasq.leases 2>/dev/null | grep "$MAC"`; do
+  until [ $i -ge 100 ] || IP_LINE=`cat /var/lib/libvirt/dnsmasq/${NETWORK/network=}.leases /var/lib/dnsmasq/dnsmasq.leases 2>/dev/null | grep "$MAC"`; do
     i=$((i + 1))
     sleep 1
   done
