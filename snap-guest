@@ -32,6 +32,8 @@ OPTIONS:
   -d [domain]    Domain suffix like "mycompany.com" (default: none)
   -f             Force creating new guest (no questions)
   -w             Add IP address to /etc/hosts (works only with NAT)
+  -g             Graphics options passed to virt-install via --graphics
+                 (default is vnc,listen=0.0.0.0)
   -s             Swap size (in MB) that is appeded as /dev/sdb to fstab
   -1 [command]   Command to execute during first boot in /root dir
                  (logfile available in /root/firstboot.log)
@@ -60,9 +62,10 @@ FORCE=0
 LIST=0
 LIST_ALL=0
 ADD_IP=0
+GRAPHICS_OPTS="vnc,listen=0.0.0.0"
 COMMAND=""
 
-while getopts "hlafwb:t:n:m:c:d:p:s:k:1:e:" opt; do
+while getopts "hlafwb:t:n:m:c:d:p:s:k:1:e:g:" opt; do
   case $opt in
     l)
       LIST=1
@@ -84,6 +87,9 @@ while getopts "hlafwb:t:n:m:c:d:p:s:k:1:e:" opt; do
       ;;
     b)
       SOURCE_NAME="$OPTARG"
+      ;;
+    g)
+      GRAPHICS_OPTS="$OPTARG"
       ;;
     t)
       TARGET_NAME="$OPTARG"
@@ -240,7 +246,8 @@ virt-install --vcpus $CPUS \
   --ram $MEM --import \
   --name $TARGET_NAME \
   --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP \
-  --vnc --noautoconsole --force \
+  --graphics "$GRAPHICS_OPTS" \
+  --noautoconsole --force \
   --network=$NETWORK,mac=$MAC \
   $NETWORK2
 
