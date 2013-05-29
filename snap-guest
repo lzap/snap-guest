@@ -214,7 +214,6 @@ $content =~ s/[0-9]$/0/g;
 $g->write ($file, $content);
 
 print "Configuring message of the day\n";
-# XXX Original code used $BASE, but I cannot see that defined anywhere.
 $content = "\n\nSnap-guest box from $ENV{BASE_IMAGE_DIR} on " . `date` . "\n\n";
 $g->write ("/etc/motd", $content);
 
@@ -239,7 +238,6 @@ elsif ($distro =~ m/^(fedora|rhel|redhat-based|centos|scientificlinux)$/) {
 
   print "Setting hostname\n";
   if ($major >= 18) {
-    # XXX original sed script did: 1 c\ $HOSTNM, whatever that means ...
     $g->write ("/etc/hostname", $ENV{HOSTNM});
   } else {
     $file = "/etc/sysconfig/network";
@@ -270,7 +268,7 @@ if ($ENV{COMMAND}) {
   $g->write ("/root/firstboot.sh", $content);
 
   $file = "/etc/rc.d/rc.local";
-  if ($g->file_exists ($file)) {
+  if ($g->exists ($file)) {
     $content = $g->read_file ($file);
   } else {
     $content = "#!/bin/bash\n";
@@ -280,7 +278,7 @@ if ($ENV{COMMAND}) {
   $g->chmod (0755, $file);
 
   $file = "/root/.bashrc";
-  if ($g->file_exists ($file)) {
+  if ($g->exists ($file)) {
     $content = $g->read_file ($file);
   } else {
     $content = "";
