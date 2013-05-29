@@ -111,7 +111,7 @@ if ($ENV{COMMAND}) {
   } else {
     $content = "";
   }
-  $content .= "\n# snap-guest\nalias tt=\"tail -f -n500 /root/firstboot.log\"";
+  $content .= "\n# snap-guest\nalias tt=\"tail -f -n500 /root/firstboot.log\"\n\n";
   $g->write ($file, $content);
 }
 
