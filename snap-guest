@@ -170,9 +170,10 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 # -- Image Manipulation ----------
 
 TMPDIR=$(mktemp -d $TARGET_NAME_XXXX)
+GUESTMOUNTPID=$(mktemp /tmp/guestmount_pid_XXXXXXXX)
 
 echo "Configuring image volume"
-guestmount -a $TARGET_IMG --rw $TMPDIR -i || exit 1
+guestmount -a $TARGET_IMG --rw $TMPDIR -i --pid-file $GUESTMOUNTPID || exit 1
 
 echo "Disabling fsck startup check for all volumes"
 sed -i 's/[0-9]$/0/g' $TMPDIR/etc/fstab
@@ -222,19 +223,22 @@ if [ ! -z "$COMMAND" ]; then
   chmod +x $TMPDIR/etc/rc.d/rc.local
 fi
 
-# use fusermount -u to unmount temp direcotory (snippet is from guestmount man page)
+# Save the PID of guestmount *before* unmonting it
+pid="$(cat $GUESTMOUNTPID)"
+fusermount -u $TMPDIR
 timeout=30
 count=$timeout
-while ! fusermount -u $TMPDIR && [ $count -gt 0 ]; do 
+while kill -0 "$pid" 2>/dev/null && [ $count -gt 0 ]; do
   sleep 1
   ((count--))
 done
 if [ $count -eq 0 ]; then
-  echo "$0: fusermount failed after $timeout seconds"
+  echo "$0: wait for guestmount to exit failed after $timeout seconds"
   exit 1
 else
   sync
   rmdir $TMPDIR
+  rm -f $GUESTMOUNTPID
 fi
 
 # -- Swap Creation --------------
