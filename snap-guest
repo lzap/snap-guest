@@ -169,77 +169,131 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 
 # -- Image Manipulation ----------
 
-TMPDIR=$(mktemp -d $TARGET_NAME_XXXX)
-GUESTMOUNTPID=$(mktemp /tmp/guestmount_pid_XXXXXXXX)
+export BASE_IMAGE_DIR COMMAND HOSTNM MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME
 
-echo "Configuring image volume"
-guestmount -a $TARGET_IMG --rw $TMPDIR -i --pid-file $GUESTMOUNTPID || exit 1
+perl -w -e '
+use strict;
+use Sys::Guestfs;
 
-echo "Disabling fsck startup check for all volumes"
-sed -i 's/[0-9]$/0/g' $TMPDIR/etc/fstab
+my $g = Sys::Guestfs->new ();
 
-echo "Configuring message of the day"
-echo -e "\n\nSnap-guest box from $BASE on $(date)\n\n" >> $TMPDIR/etc/motd
+# For debugging.
+#$g->set_trace (1);
 
-# add host and host.domain localhost record there
-echo "Configuring /etc/hosts file"
-grep $SOURCE_NAME $TMPDIR/etc/hosts && sed -i -e "s/$SOURCE_NAME/localbox/" $TMPDIR/etc/hosts
-echo "127.0.0.1 $TARGET_NAME $HOSTNM" >> $TMPDIR/etc/hosts
+# Add the disk and launch.
+$g->add_drive_opts ($ENV{TARGET_IMG}, format => "qcow2");
+$g->launch ();
 
-# this must be set for Fedora 18+ (more info in hostnamectl)
-echo "Setting hostname in /etc/hostname"
-[ -f $TMPDIR/etc/hostname ] && sed -i -e "1 c\ $HOSTNM" $TMPDIR/etc/hostname
+# Inspect for OSes.
+my @roots = $g->inspect_os ();
+die "no operating system was found" if @roots == 0;
+die "dual/multi-boot operating system not supported" if @roots > 1;
+my $root = $roots[0];
 
-# dedicated configuration for various distributions
-if [ -f $TMPDIR/etc/debian_version ]; then
-  echo "Setting up for Debian"
+# Get OS and version.
+my $type = $g->inspect_get_type ($root);
+my $distro = $g->inspect_get_distro ($root);
+my $major = $g->inspect_get_major_version ($root);
+my $minor = $g->inspect_get_minor_version ($root);
 
-  # N/A
-elif [ -f $TMPDIR/etc/redhat-release -o -f $TMPDIR/etc/fedora-release ]; then
-  echo "Setting up for Fedora / RHEL"
+print "OS: $type $distro $major $minor\n";
 
-  echo "Setting MAC address"
-  sed -i -e "s/HWADDR=.*/HWADDR=$MAC/" $TMPDIR/etc/sysconfig/network-scripts/ifcfg-eth0
+# Mount up the operating system disks.
+my %mps = $g->inspect_get_mountpoints ($root);
+my @mps = sort { length $a <=> length $b } (keys %mps);
+for my $mp (@mps) {
+  eval { $g->mount ($mps{$mp}, $mp) }
+}
 
-  echo "Setting hostname for Fedora (pre-18)" 
-  if [ grep HOSTNAME $TMPDIR/etc/sysconfig/network 2>/dev/null ]; then
-    sed -i -e "s/HOSTNAME=.*/HOSTNAME=$HOSTNM/" $TMPDIR/etc/sysconfig/network
-  else
-    echo -e "\n\n# added by snap-guest\nHOSTNAME=$HOSTNM" >> $TMPDIR/etc/sysconfig/network
-  fi
-fi
+print "Disable fsck startup check for all volumes\n";
+my $file;
+my $content;
+$file = "/etc/fstab";
+$content = $g->read_file ($file);
+$content =~ s/[0-9]$/0/g;
+$g->write ($file, $content);
 
-# mount swap partition
-if [ $SWAP -gt 0 ]; then
-  # add swap file
-  echo '/dev/vdb none swap swap 0 0' >> $TMPDIR/etc/fstab
-fi
+print "Configuring message of the day\n";
+# XXX Original code used $BASE, but I cannot see that defined anywhere.
+$content = "\n\nSnap-guest box from $ENV{BASE_IMAGE_DIR} on " . `date` . "\n\n";
+$g->write ("/etc/motd", $content);
 
-# prepare firstboot command and tt "watch progress" alias
-if [ ! -z "$COMMAND" ]; then
-  echo -e "pushd /root\n$COMMAND\npopd" > $TMPDIR/root/firstboot.sh
-  echo -e "#!/bin/bash\nbash -x /root/firstboot.sh 2>&1 | /usr/bin/tee /root/firstboot.log" >> $TMPDIR/etc/rc.d/rc.local
-  echo -e "\n# snap-guest\nalias tt='tail -f -n500 /root/firstboot.log'" >> $TMPDIR/root/.bashrc
-  chmod +x $TMPDIR/etc/rc.d/rc.local
-fi
+print "Configuring /etc/hosts file\n";
+$file = "/etc/hosts";
+$content = $g->read_file ($file);
+$content =~ s/$ENV{SOURCE_NAME}/localbox/g;
+$content .= "\n127.0.0.1 $ENV{TARGET_NAME} $ENV{HOSTNM}\n";
+$g->write ($file, $content);
 
-# Save the PID of guestmount *before* unmonting it
-pid="$(cat $GUESTMOUNTPID)"
-fusermount -u $TMPDIR
-timeout=30
-count=$timeout
-while kill -0 "$pid" 2>/dev/null && [ $count -gt 0 ]; do
-  sleep 1
-  ((count--))
-done
-if [ $count -eq 0 ]; then
-  echo "$0: wait for guestmount to exit failed after $timeout seconds"
-  exit 1
-else
-  sync
-  rmdir $TMPDIR
-  rm -f $GUESTMOUNTPID
-fi
+if ($distro eq "debian" || $distro eq "ubuntu") {
+  print "Setting up for Debian\n";
+  # nothing
+}
+elsif ($distro =~ m/^(fedora|rhel|redhat-based|centos|scientificlinux)$/) {
+  print "Setting up for Fedora / RHEL\n";
+  print "Setting MAC address\n";
+  $file = "/etc/sysconfig/network-scripts/ifcfg-eth0";
+  $content = $g->read_file ($file);
+  $content =~ s/HWADDR=.*/HWADDR=$ENV{MAC}/g;
+  $g->write ($file, $content);
+
+  print "Setting hostname\n";
+  if ($major >= 18) {
+    # XXX original sed script did: 1 c\ $HOSTNM, whatever that means ...
+    $g->write ("/etc/hostname", $ENV{HOSTNM});
+  } else {
+    $file = "/etc/sysconfig/network";
+    my @lines = $g->read_lines ($file);
+    my $found_it = 0;
+    foreach (@lines) {
+      s/HOSTNAME=.*/HOSTNAME=$ENV{HOSTNM}/;
+      $found_it = 1;
+    }
+    if (!$found_it) {
+      push @lines, "# added by snap-guest", "HOSTNAME=$ENV{HOSTNM}";
+    }
+    $g->write ($file, join ("\n", @lines) . "\n");
+  }
+}
+
+if ($ENV{SWAP}) {
+  print "Adding swap file\n";
+  $file = "/etc/fstab";
+  $content = $g->read_file ($file);
+  $content .= "\n/dev/vdb none swap swap 0 0\n";
+  $g->write ($file, $content);
+}
+
+if ($ENV{COMMAND}) {
+  print "Preparing fristboot command and tt watch progress alias\n";
+  $content = "pushd /root\n$ENV{COMMAND}\npopd\n";
+  $g->write ("/root/firstboot.sh", $content);
+
+  $file = "/etc/rc.d/rc.local";
+  if ($g->file_exists ($file)) {
+    $content = $g->read_file ($file);
+  } else {
+    $content = "#!/bin/bash\n";
+  }
+  $content .= "\nbash -x /root/firstboot.sh 2>&1 | /usr/bin/tee /root/firstboot.log\n";
+  $g->write ($file, $content);
+  $g->chmod (0755, $file);
+
+  $file = "/root/.bashrc";
+  if ($g->file_exists ($file)) {
+    $content = $g->read_file ($file);
+  } else {
+    $content = "";
+  }
+  $content .= "\n# snap-guest\nalias tt=\"tail -f -n500 /root/firstboot.log\"";
+  $g->write ($file, $content);
+}
+
+# Shutdown the appliance cleanly.
+$g->umount_all ();
+$g->shutdown ();
+$g->close ();
+'
 
 # -- Swap Creation --------------
 
