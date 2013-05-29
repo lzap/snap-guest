@@ -18,12 +18,9 @@ Features
 Requirements
 ------------
 
- * bash :-)
- * sed
- * python-virtinst
- * qemu-img
- * libguestfs-mount
- * vim (no, you don't really need it, but it's recommended :-)
+This is for RHEL6/Fedora:
+
+    yum -y install sed python-virtinst qemu-img libguestfs-mount perl-Sys-Guestfs
 
 Installation
 ------------
