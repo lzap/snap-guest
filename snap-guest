@@ -222,7 +222,20 @@ if [ ! -z "$COMMAND" ]; then
   chmod +x $TMPDIR/etc/rc.d/rc.local
 fi
 
-umount $TMPDIR && rmdir $TMPDIR
+# use fusermount -u to unmount temp direcotory (snippet is from guestmount man page)
+timeout=30
+count=$timeout
+while ! fusermount -u $TMPDIR && [ $count -gt 0 ]; do 
+  sleep 1
+  ((count--))
+done
+if [ $count -eq 0 ]; then
+  echo "$0: fusermount failed after $timeout seconds"
+  exit 1
+else
+  sync
+  rmdir $TMPDIR
+fi
 
 # -- Swap Creation --------------
 
