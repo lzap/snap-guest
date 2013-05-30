@@ -30,6 +30,7 @@ OPTIONS:
   -p [path]      Target images path (default: /var/lib/libvirt/images/)
   -e [path]      Base images path (default: /var/lib/libvirt/images/)
   -d [domain]    Domain suffix like "mycompany.com" (default: none)
+  -x [prefix]    Domain prefix like "test-" -> "test-NAME.lan" (default: none)
   -f             Force creating new guest (no questions)
   -w             Add IP address to /etc/hosts (works only with NAT)
   -g             Graphics options passed to virt-install via --graphics
@@ -67,6 +68,7 @@ CPUS="1"
 IMAGE_DIR="/var/lib/libvirt/images"
 BASE_IMAGE_DIR="/var/lib/libvirt/images"
 DOMAIN=""
+PREFIX=""
 FORCE=0
 LIST=0
 LIST_ALL=0
@@ -74,7 +76,7 @@ ADD_IP=0
 GRAPHICS_OPTS="vnc,listen=0.0.0.0"
 COMMAND=""
 
-while getopts "hlafwb:t:n:m:c:d:p:s:k:1:e:g:" opt; do
+while getopts "hlafwb:t:n:m:c:d:x:p:s:k:1:e:g:" opt; do
   case $opt in
     l)
       LIST=1
@@ -118,6 +120,9 @@ while getopts "hlafwb:t:n:m:c:d:p:s:k:1:e:g:" opt; do
     d)
       DOMAIN=".$OPTARG"
       ;;
+    x)
+      PREFIX="$OPTARG"
+      ;;
     s)
       SWAP="$OPTARG"
       ;;
@@ -148,7 +153,7 @@ SOURCE_IMG=$(ls -v1 $BASE_IMAGE_DIR/${SOURCE_NAME}*.img | tail -n1)
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
 TARGET_IMG_SWAP=$IMAGE_DIR/$TARGET_NAME-swap.img
 MAC="52:54:00$(echo "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
-HOSTNM="$TARGET_NAME$DOMAIN"
+HOSTNM="$PREFIX$TARGET_NAME$DOMAIN"
 
 if [ ! -f "$SOURCE_IMG" ]; then
   echo "Base image $SOURCE_IMG not found!"
