@@ -49,7 +49,7 @@ print "Configuring /etc/hosts file\n";
 $file = "/etc/hosts";
 $content = $g->read_file ($file);
 $content =~ s/$ENV{SOURCE_NAME}/localbox/g;
-$content .= "\n127.0.0.1 $ENV{TARGET_NAME} $ENV{HOSTNM}\n";
+$content .= "\n127.0.0.1 $ENV{TARGET_NAME} $ENV{TARGET_HOSTNAME}\n";
 $g->write ($file, $content);
 
 if ($distro eq "debian" || $distro eq "ubuntu") {
@@ -66,17 +66,17 @@ elsif ($distro =~ m/^(fedora|rhel|redhat-based|centos|scientificlinux)$/) {
 
   print "Setting hostname\n";
   if ($major >= 18) {
-    $g->write ("/etc/hostname", $ENV{HOSTNM});
+    $g->write ("/etc/hostname", $ENV{TARGET_HOSTNAME});
   } else {
     $file = "/etc/sysconfig/network";
     my @lines = $g->read_lines ($file);
     my $found_it = 0;
     foreach (@lines) {
-      s/HOSTNAME=.*/HOSTNAME=$ENV{HOSTNM}/;
+      s/HOSTNAME=.*/HOSTNAME=$ENV{TARGET_HOSTNAME}/;
       $found_it = 1;
     }
     if (!$found_it) {
-      push @lines, "# added by snap-guest", "HOSTNAME=$ENV{HOSTNM}";
+      push @lines, "# added by snap-guest", "HOSTNAME=$ENV{TARGET_HOSTNAME}";
     }
     $g->write ($file, join ("\n", @lines) . "\n");
   }

@@ -153,7 +153,7 @@ SOURCE_IMG=$(ls -v1 $BASE_IMAGE_DIR/${SOURCE_NAME}*.img | tail -n1)
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
 TARGET_IMG_SWAP=$IMAGE_DIR/$TARGET_NAME-swap.img
 MAC="52:54:00$(echo "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
-HOSTNM="$PREFIX$TARGET_NAME$DOMAIN"
+TARGET_HOSTNAME="$PREFIX$TARGET_NAME$DOMAIN"
 
 if [ ! -f "$SOURCE_IMG" ]; then
   echo "Base image $SOURCE_IMG not found!"
@@ -183,7 +183,7 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 
 # -- Image Manipulation ----------
 
-export BASE_IMAGE_DIR COMMAND HOSTNM MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME
+export BASE_IMAGE_DIR COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME
 perl -w "$SCRIPTDIR/prepare-image.pl"
 
 # -- Swap Creation --------------
@@ -199,7 +199,7 @@ fi
 # -- Image Provisioning ---------
 
 echo "Provisioning guest $TARGET_NAME"
-echo "Hostname: $HOSTNM"
+echo "Hostname: $TARGET_HOSTNAME"
 echo "CPUs:     $CPUS"
 echo "Memory:   $MEM MB"
 echo "Swap:     $MEM MB"
@@ -225,12 +225,12 @@ if [ $ADD_IP -eq 1 ]; then
 
   if [[ -n $IP_LINE ]]; then
     IP=`echo  $IP_LINE | awk '{print $3}'`
-    if ! grep -q "$HOSTNM\$" /etc/hosts; then
+    if ! grep -q "$TARGET_HOSTNAME\$" /etc/hosts; then
       echo "Writing into /etc/hosts ip: $IP"
-      echo "$IP $HOSTNM $TARGET_NAME" >> /etc/hosts
+      echo "$IP $TARGET_HOSTNAME $TARGET_NAME" >> /etc/hosts
     else
-      echo "Host $HOSTNM already in hosts"
-      OLD_IP=`grep "$HOSTNM\$" /etc/hosts | head -n 1 | awk '{print $1}'`
+      echo "Host $TARGET_HOSTNAME already in hosts"
+      OLD_IP=`grep "$TARGET_HOSTNAME\$" /etc/hosts | head -n 1 | awk '{print $1}'`
       if [[ $IP = $OLD_IP ]]; then
         echo "and these ip's match"
       else
