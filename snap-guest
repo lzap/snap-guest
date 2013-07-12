@@ -89,7 +89,7 @@ aflag=no
 bflag=no
 cargument=none
 
-if ! options=$(getopt -o hlafwb:t:n:m:c:d:x:p:s:k:1:e:g: -l along,blong,clong: -- "$@"); then
+if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,help -- "$@"); then
   exit 1
 fi
 
