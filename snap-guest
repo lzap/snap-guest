@@ -93,7 +93,7 @@ if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,add-ip,
   exit 1
 fi
 
-set -- $options
+eval set -- $options
 
 while [ $# -gt 0 ]; do
     case $1 in
