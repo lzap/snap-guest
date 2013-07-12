@@ -5,44 +5,53 @@ usage() {
 cat <<USAGE
 usage: $0 options
 
-Simple script for creating copy-on-write QEMU/KVM guests. For the base image
-install Fedora or RHEL (compatible), install acpid and ntpd or similar, do not
-make any swap partition (use -s option), make sure the hostname is the same
-as the vm name and it has "base" in it. Example: rhel-6-base.
-
-You can have more versions of the base image e.g. rhel-6-base-1,
-rhel-6-base-2 etc. If you want snap a guest from rhel-6-base, the latest version
-(a version with highest suffix number) will be used.
-
-WARNING: This script is for development and testing purposes, it is NOT
-recommended to provision production systems with it. You have been warned!
+Tool for ultra-fast copy-on-write image provisioning. Prepare a base image (or
+download a cloud image) and then spawn an COW instance. Then again, and again.
 
 OPTIONS:
-  -h             Show this message
-  -l             List avaiable images (with "base" in the name)
-  -a             List all images
-  -b [image]     Base image name (template) - required
-  -t [image]     Target image name (and hostname) - required
-  -n [network]   Network settings (default: "network=default")
-  -k [network2]  Second network NIC settings (none by default)
-  -m [MB]        Memory (default: 800 MiB)
-  -c [CPUs]      Number of CPUs (default: 1)
-  -p [path]      Target images path (default: /var/lib/libvirt/images/)
-  -e [path]      Base images path (default: /var/lib/libvirt/images/)
-  -d [domain]    Domain suffix like "mycompany.com" (default: none)
-  -x [prefix]    Domain prefix like "test-" -> "test-NAME.lan" (default: none)
-  -f             Force creating new guest (no questions)
-  -w             Add IP address to /etc/hosts (works only with NAT)
-  -g             Graphics options passed to virt-install via --graphics
-                 (default is vnc,listen=0.0.0.0)
-  -s             Swap size (in MB) that is appeded as /dev/sdb to fstab
-  -1 [command]   Command to execute during first boot in /root dir
-                 (logfile available in /root/firstboot.log)
+  --help | -h             
+        Show this message
+  --list | -l
+        List avaiable images (with "base" in the name)
+  --list-all
+        List all images
+  --base [image] | -b [image]
+        Base image name (template) - required
+  --target [name] | -t [name]
+        Target image name (and hostname) - required
+  --network [opts] | -n [opts]
+        Network options for virt-install (default: "network=default")
+  --network2 [opts]
+        Second network NIC settings (none by default)
+  --memory [MB] | -m [MB]
+        Memory (default: 800 MiB)
+  --cpus [CPUs] | -c [CPUs]
+        Number of CPUs (default: 1)
+  --image-dir [path] | -p [path]
+        Target images path (default: /var/lib/libvirt/images/)
+  --base-image-dir [path]
+        Base images path (default: /var/lib/libvirt/images/)
+  --domain [domain] | -d [domain]
+        Domain suffix like "mycompany.com" (default: none)
+  --domain-prefix [prefix]
+        Domain prefix like "test-" -> "test-NAME.lan" (default: none)
+  --force | -f
+        Force creating new guest (no questions, destroys one the same name)
+  --add-ip | -w
+        Add IP address to /etc/hosts (works only with NAT)
+  --graphics [opts] | -g [opts]
+        Graphics options passed to virt-install via --graphics
+        (default is vnc,listen=0.0.0.0)
+  --swap [MBs] | -s [MBs]
+        Swap size (in MB) that is appeded as /dev/sdb to fstab
+  --firstboot [command] | -1 [command]
+        Command to execute during first boot in /root dir
+        (logfile available in /root/firstboot.log)
 
 EXAMPLE:
 
-  $0 -l
-  $0 -p /mnt/data/images -l
+  $0 --list
+  $0 -p /mnt/data/images --list-all
   $0 -b fedora-17-base -t test-vm -s 4098
   $0 -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
   $0 -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
@@ -76,69 +85,41 @@ ADD_IP=0
 GRAPHICS_OPTS="vnc,listen=0.0.0.0"
 COMMAND=""
 
-while getopts "hlafwb:t:n:m:c:d:x:p:s:k:1:e:g:" opt; do
-  case $opt in
-    l)
-      LIST=1
-      ;;
-    a)
-      LIST_ALL=1
-      ;;
-    f)
-      FORCE=1
-      ;;
-    w)
-      ADD_IP=1
-      ;;
-    p)
-      IMAGE_DIR="$OPTARG"
-      ;;
-    e)
-      BASE_IMAGE_DIR="$OPTARG"
-      ;;
-    b)
-      SOURCE_NAME="$OPTARG"
-      ;;
-    g)
-      GRAPHICS_OPTS="$OPTARG"
-      ;;
-    t)
-      TARGET_NAME="$OPTARG"
-      ;;
-    n)
-      NETWORK="$OPTARG"
-      ;;
-    k)
-      NETWORK2="--network=$OPTARG"
-      ;;
-    m)
-      MEM="$OPTARG"
-      ;;
-    c)
-      CPUS="$OPTARG"
-      ;;
-    d)
-      DOMAIN=".$OPTARG"
-      ;;
-    x)
-      PREFIX="$OPTARG"
-      ;;
-    s)
-      SWAP="$OPTARG"
-      ;;
-    1)
-      COMMAND="$OPTARG"
-      ;;
-    h)
-      usage
-      exit
-      ;;
-    ?)
-      echo "Invalid option: $OPTARG" >&2
-      usage
-      exit
-      ;;
-  esac
+aflag=no
+bflag=no
+cargument=none
+
+if ! options=$(getopt -o hlafwb:t:n:m:c:d:x:p:s:k:1:e:g: -l along,blong,clong: -- "$@"); then
+  exit 1
+fi
+
+set -- $options
+
+while [ $# -gt 0 ]; do
+    case $1 in
+    --list|-l) LIST=1 ;;
+    --list-all) LIST_ALL=1 ;;
+    --force|-f) FORCE=1 ;;
+    --add-ip|-w) ADD_IP=1 ;;
+    --image-dir|-p) IMAGE_DIR="$2" ; shift ;;
+    --base-image-dir) BASE_IMAGE_DIR="$2" ; shift ;;
+    --base|--b) SOURCE_NAME="$2" ; shift ;;
+    --graphics|-g) GRAPHICS_OPTS="$2" ; shift ;;
+    --target|-t) TARGET_NAME="$2" ; shift ;;
+    --network|-n) NETWORK="$2" ; shift ;;
+    --network2) NETWORK2="--network=$2" ; shift ;;
+    --memory|-m) MEM="$2" ; shift ;;
+    --cpus|-c) CPUS="$2" ; shift ;;
+    --domain|-d) DOMAIN=".$2" ; shift ;;
+    --domain-prefix) PREFIX="$2" ; shift ;;
+    --swap|-s) SWAP="$2" ; shift ;;
+    --firstboot|-1) COMMAND="$2" ; shift ;;
+    --help|-h) usage;  exit ;;
+    (--) shift; break;;
+    (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
+    (*) break;;
+    esac
+    shift
 done
 
 [ $LIST -eq 1 ] && ls "$BASE_IMAGE_DIR" | grep '\.img' | grep base | sed 's/\.img//g' && exit 0
