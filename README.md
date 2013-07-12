@@ -3,6 +3,9 @@ Quick provision script snap-guest for QEMU/KVM
 
 Snap-guest is a simple script for creating copy-on-write QEMU/KVM guests.
 
+Fedora KVM instance booted into working shell in 2 seconds? No containers 
+involved, no magic.
+
 Upstream site is at http://github.com/lzap/snap-guest
 
 Features
@@ -15,22 +18,26 @@ Features
  * creates and provisions guest using virt-install
  * nice cli interface
 
-Requirements
-------------
-
-This is for RHEL6/Fedora:
-
-    yum -y install sed python-virtinst qemu-img libguestfs-mount perl-Sys-Guestfs
-
 Installation
 ------------
 
- * yum -y install bash sed python-virtinst qemu-img libguestfs-mount
+Dependencies for RHEL6/Fedora:
+
+ * yum -y install bash sed python-virtinst qemu-img libguestfs-mount \
+    perl perl-Sys-Guestfs kvm cloud-utils openssl util-linux genisoimage
+
+And then:
+
  * git clone git://github.com/lzap/snap-guest.git
  * sudo ln -s $PWD/snap-guest/snap-guest /usr/local/bin/snap-guest
 
 How it works
 ------------
+
+There are two ways of using snap-guest: traditional image manipulation and 
+cloud image based snapping.
+
+*Traditional image manipulation*
 
 First of all you need to create base image using any method you want (e.g. 
 virt-manager). It's recommended to use "base" string in the guest name
@@ -77,45 +84,117 @@ The usage is very easy then:
 
     usage: ./snap-guest options
 
-    Simple script for creating copy-on-write QEMU/KVM guests. For the base image
-    install Fedora or RHEL (compatible), install acpid and ntpd or similar, do not
-    make any swap partition (use -s option), make sure the hostname is the same
-    as the vm name and it has "base" in it. Example: rhel-6-base.
+    Tool for ultra-fast copy-on-write image provisioning. Prepare a base image (or
+    download a cloud image) and then spawn an COW instance. Then again, and again.
 
     OPTIONS:
-      -h             Show this message
-      -l             List avaiable images (with "base" in the name)
-      -a             List all images
-      -b [image]     Base image name (template) - required
-      -t [image]     Target image name (and hostname) - required
-      -n [network]   Network settings (default: "network=default")
-      -m [MB]        Memory (default: 800 MiB)
-      -c [CPUs]      Number of CPUs (default: 1)
-      -p [path]      Images path (default: /var/lib/libvirt/images/)
-      -d [domain]    Domain suffix like "mycompany.com" (default: none)
-      -f             Force creating new guest (no questions)
-      -w             Add IP address to /etc/hosts (works only with NAT)
-      -s             Swap size (in MB) that is appeded as /dev/sdb to fstab
-      -1 [command]   Command to execute during first boot in /root dir
-                     (logfile available in /root/firstboot.log)
+      --help | -h             
+            Show this message
+      --list | -l
+            List avaiable images (with "base" in the name)
+      --list-all
+            List all images
+      --base [image] | -b [image]
+            Base image name (template) - required
+      --target [name] | -t [name]
+            Target image name (and hostname) - required
+      --network [opts] | -n [opts]
+            Network options for virt-install (default: "network=default")
+      --network2 [opts]
+            Second network NIC settings (none by default)
+      --memory [MB] | -m [MB]
+            Memory (default: 800 MiB)
+      --cpus [CPUs] | -c [CPUs]
+            Number of CPUs (default: 1)
+      --image-dir [path] | -p [path]
+            Target images path (default: /var/lib/libvirt/images/)
+      --base-image-dir [path]
+            Base images path (default: /var/lib/libvirt/images/)
+      --domain [domain] | -d [domain]
+            Domain suffix like "mycompany.com" (default: none)
+      --domain-prefix [prefix]
+            Domain prefix like "test-" -> "test-NAME.lan" (default: none)
+      --force | -f
+            Force creating new guest (no questions, destroys one the same name)
+      --add-ip | -w
+            Add IP address to /etc/hosts (works only with NAT)
+      --graphics [opts] | -g [opts]
+            Graphics options passed to virt-install via --graphics
+            (default is vnc,listen=0.0.0.0)
+      --swap [MBs] | -s [MBs]
+            Creates RAW disk and connects and mounts it of given size (in MB)
+            Note the virtual disc has no parititions.
+            For cloud-image provisioning swap is not turned on automatically and
+            you need to do this manually in user-data script (swapon /dev/vdb).
+      --firstboot [command] | -1 [command]
+            Command to execute during first boot in /root dir
+            (logfile available in /root/firstboot.log)
+      --cloud-image
+            Disables image manipulation and enables cloud-init seed via CD-ROM
+      --user-data-file [file]
+            Reads cloud-init user-data from file
+      --user-data-ssh
+            Generate primitive user-data file with only your public ssh key
+      --user-data-stdin
+            Reads cloud-init user-data from standard input
+            (overrides all --user-data-* options)
 
     EXAMPLE:
 
-      ./snap-guest -l
-      ./snap-guest -p /mnt/data/images -l
+      ./snap-guest --list
+      ./snap-guest -p /mnt/data/images --list-all
       ./snap-guest -b fedora-17-base -t test-vm -s 4098
       ./snap-guest -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
       ./snap-guest -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
+      echo "my user data" | ./snap-guest -b f19 -t aa --cloud-image --user-data-stdin \
+        -n bridge=br0 -d xxx.redhat.com --domain-prefix 'lzap-' -s 2048 -f
 
-Snap-guest is a great tool for developing or testing. Provisioning a new
-guest  from a template is very fast (about 5-10 seconds).
+*Cloud image based snapping*
+
+Don't want to bother preparing base images? Why not to leverage one of these 
+which are already there! http://openstack.redhat.com/Image_resources
+
+Have a working Fedora instance in three simple steps:
+
+    # wget http://cloud.fedoraproject.org/fedora-19.x86_64.qcow2 \
+        -O /var/lib/libvirt/images/f19-base.img
+    # snap-guest -b f19 -t myguest --cloud-image --user-data-ssh
+    # ssh fedora@192.168.122.123
+
+Do you like that? Snap that again, now maybe with custom user data and bridged 
+networking and full hostname with domain. If you don't know cloud-init syntax, 
+read this: https://help.ubuntu.com/community/CloudInit
+
+    # snap-guest -b f19 -t myguest --cloud-image --user-data-file my_app.yaml \
+        --network bridge=br0 --domain xxx.redhat.com --force
+
+Note that you don't need to delete the running host. The --force option will 
+destroy and undefine previous guest automatically.
+
+Now you want to move snap-guest to a server and snap instances from your 
+laptop. Not a problem!
+    
+    # cat my_app.yaml | ssh root@dev-server "snap-guest -b f19 -t myguest \
+        --cloud-image --user-data-stdin -n bridge=br0 -d xxx.redhat.com -f"
+
+And now you want more complex scenario - you want to install things on that 
+instance during start. With cloud-utils tool, you can create multipart user 
+data with bash scripts and other things.
+
+    # write-mime-multipart --output=combined-my_app.yaml \
+        install_software.sh:text/x-shellscript \
+        my_app.yaml
+    # cat my_app.yaml | ssh root@dev-server "snap-guest -b f19 ..."
+
+Of course you can directly pipe the former command into the latter, but we 
+leave this as an exercise.
 
 Warning
 -------
 
 There is one **important thing** you need to know. Once you have some guests, 
-you **must not start** a template image, because that would break the "child" 
-guests.
+you **must not start** template (base) image, because that would break the 
+"child" guests.
 
 You also **must not** change a template even when the "child" guests are 
 _not_ running. Again, if anything changes in a template, images based on the 
@@ -163,6 +242,11 @@ bigger block size. Something like:
     # lvdisplay
     # lvcreate -L 140G -n lv_images vg_myhost
     # mkfs.ext4 -b 4096 -O extent /dev/mapper/vg_myhost-lv_images
+
+So
+--
+
+Snap-guest is a great tool for developing or testing. It's simple and fast.
 
 Credits and license
 -------------------

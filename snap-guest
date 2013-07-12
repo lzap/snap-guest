@@ -1,5 +1,4 @@
 #!/bin/bash
-# Requirements: python-virtinst qemu-img libguestfs-mount sed bash
 
 usage() {
 cat <<USAGE
@@ -43,10 +42,22 @@ OPTIONS:
         Graphics options passed to virt-install via --graphics
         (default is vnc,listen=0.0.0.0)
   --swap [MBs] | -s [MBs]
-        Swap size (in MB) that is appeded as /dev/sdb to fstab
+        Creates RAW disk and connects and mounts it of given size (in MB)
+        Note the virtual disc has no parititions.
+        For cloud-image provisioning swap is not turned on automatically and
+        you need to do this manually in user-data script (swapon /dev/vdb).
   --firstboot [command] | -1 [command]
         Command to execute during first boot in /root dir
         (logfile available in /root/firstboot.log)
+  --cloud-image
+        Disables image manipulation and enables cloud-init seed via CD-ROM
+  --user-data-file [file]
+        Reads cloud-init user-data from file
+  --user-data-ssh
+        Generate primitive user-data file with only your public ssh key
+  --user-data-stdin
+        Reads cloud-init user-data from standard input
+        (overrides all --user-data-* options)
 
 EXAMPLE:
 
@@ -55,6 +66,8 @@ EXAMPLE:
   $0 -b fedora-17-base -t test-vm -s 4098
   $0 -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
   $0 -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
+  echo "my user data" | $0 -b f19 -t aa --cloud-image --user-data-stdin \\
+    -n bridge=br0 -d xxx.redhat.com --domain-prefix 'lzap-' -s 2048 -f
 USAGE
 }
 
@@ -84,12 +97,12 @@ LIST_ALL=0
 ADD_IP=0
 GRAPHICS_OPTS="vnc,listen=0.0.0.0"
 COMMAND=""
+CLOUD=0
+USER_DATA_STDIN=0
+USER_DATA_FILE=""
+USER_DATA_SSH=0
 
-aflag=no
-bflag=no
-cargument=none
-
-if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,help -- "$@"); then
+if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,cloud-image,user-data-ssh,user-data-stdin,user-data-file:,help -- "$@"); then
   exit 1
 fi
 
@@ -114,6 +127,10 @@ while [ $# -gt 0 ]; do
     --domain-prefix) PREFIX="$2" ; shift ;;
     --swap|-s) SWAP="$2" ; shift ;;
     --firstboot|-1) COMMAND="$2" ; shift ;;
+    --cloud-image) CLOUD=1 ;;
+    --user-data-stdin) USER_DATA_STDIN=1 ;;
+    --user-data-ssh) USER_DATA_SSH=1 ;;
+    --user-data-file) USER_DATA_FILE="$2" ; shift ;;
     --help|-h) usage;  exit ;;
     (--) shift; break;;
     (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
@@ -126,9 +143,17 @@ done
 [ $LIST_ALL -eq 1 ] && ls "$BASE_IMAGE_DIR" | grep '\.img' | sed 's/\.img//g' && exit 0
 
 if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
-  usage
-  exit 1
+  usage; exit 1
 fi
+
+# Check prerequisites
+for BINARY in getopt virsh qemu-img mkswap sed tail openssl hexdump perl genisoimage virt-install; do
+  if ! type -p $BINARY >/dev/null ; then
+    echo "Please install '$BINARY' first to use snap-guest!" 1>&2
+    echo "See https://github.com/lzap/snap-guest#installation" 1>&2
+    exit 1
+  fi
+done
 
 SOURCE_IMG=$(ls -v1 $BASE_IMAGE_DIR/${SOURCE_NAME}*.img | tail -n1)
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
@@ -164,8 +189,40 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 
 # -- Image Manipulation ----------
 
-export BASE_IMAGE_DIR COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME
-perl -w "$SCRIPTDIR/prepare-image.pl"
+if [ $CLOUD -eq 0 ]; then
+  export BASE_IMAGE_DIR COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME
+  perl -w "$SCRIPTDIR/prepare-image.pl"
+fi
+
+# -- Cloud Init -----------------
+
+if [ $CLOUD -eq 1 ]; then
+  echo "Generating cloud-init seed"
+  TARGET_IMG_SEED="$IMAGE_DIR/seed-$TARGET_NAME.iso"
+  CITEMP=$(mktemp -d)
+  trap "rm -rf $CITEMP" EXIT
+  cat > "$CITEMP/meta-data" <<EOS
+instance-id: $TARGET_HOSTNAME
+local-hostname: $TARGET_HOSTNAME
+EOS
+  [ ! -z "$USER_DATA_FILE" ] && cp "$USER_DATA_FILE" "$CITEMP/user-data"
+  [ $USER_DATA_SSH -eq 1 ] && cat > "$CITEMP/user-data" <<EOS
+#cloud-config
+ssh_authorized_keys:
+ - $(cat ~/.ssh/id_rsa.pub)
+EOS
+  [ $USER_DATA_STDIN -eq 1 ] && cat > "$CITEMP/user-data" </dev/stdin
+  if [ ! -f "$CITEMP/user-data" ]; then
+    echo "Please provide at least one --user-data option" 1>&2; exit 1
+  fi
+  pushd "$CITEMP" 2>/dev/null
+  genisoimage -output $TARGET_IMG_SEED -volid cidata -joliet -rock user-data meta-data
+  popd 2>/dev/null
+  cat "$CITEMP/user-data"
+  DISK_SEED="--disk $TARGET_IMG_SEED,device=cdrom"
+else
+  DISK_SEED=""
+fi
 
 # -- Swap Creation --------------
 
@@ -188,7 +245,7 @@ echo "MAC:      $MAC"
 virt-install --vcpus $CPUS \
   --ram $MEM --import \
   --name $TARGET_NAME \
-  --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP \
+  --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP $DISK_SEED \
   --graphics "$GRAPHICS_OPTS" \
   --noautoconsole --force \
   --network=$NETWORK,mac=$MAC \
