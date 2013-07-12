@@ -103,7 +103,7 @@ while [ $# -gt 0 ]; do
     --add-ip|-w) ADD_IP=1 ;;
     --image-dir|-p) IMAGE_DIR="$2" ; shift ;;
     --base-image-dir) BASE_IMAGE_DIR="$2" ; shift ;;
-    --base|--b) SOURCE_NAME="$2" ; shift ;;
+    --base|-b) SOURCE_NAME="$2" ; shift ;;
     --graphics|-g) GRAPHICS_OPTS="$2" ; shift ;;
     --target|-t) TARGET_NAME="$2" ; shift ;;
     --network|-n) NETWORK="$2" ; shift ;;
