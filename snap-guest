@@ -218,6 +218,7 @@ EOS
   [ ! -z "$USER_DATA_FILE" ] && cp "$USER_DATA_FILE" "$CITEMP/user-data"
   [ $USER_DATA_SSH -eq 1 ] && cat > "$CITEMP/user-data" <<EOS
 #cloud-config
+disable_root: 0
 ssh_authorized_keys:
  - $(cat ~/.ssh/id_rsa.pub)
 EOS
