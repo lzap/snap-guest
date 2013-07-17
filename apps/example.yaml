@@ -1,7 +1,87 @@
 #cloud-config
 locale: en_US.UTF-8
+
+# we do not want to disable root because snap-guest is supposed for development
+# (this is not recommended for production deployment of course)
 disable_root: 0
 
+# this is my own key - replace with yours :-D
 ssh_authorized_keys:
- - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8w6DONv1qn3IdgxSpkYOClq7oe7davWFqKVHPbLoS6+dFInru7gdEO5byhTih6+PwRhHv/b1I+Mtt5MDZ8Sv7XFYpX/3P/u5zQiy1PkMSFSz0brRRUfEQxhXLW97FJa7l+bej2HJDt7f9Gvcj+d/fNWC9Z58/GX11kWk4SIXaKotkN+kWn54xGGS7Zvtm86fP59Srt6wlklSsG8mZBF7jVUjyhAgm/V5gDFb2/6jfiwSb2HyJ9/NbhLkWNdwrvpdGZqQlYhnwTfEZdpwizW/Mj3MxP5O31HN45aE0wog0UeWY4gvTl4Ogb6kescizAM6pCff3RBslbFxLdOO7cR17 lzap+rsakey@redhat.com
+ - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8w6DONv1qn3IdgxSpkYOClq7oe7davWFqKVHPbLoS6+dFInru7gdEO5byhTih6+PwRhHv/b1I+Mtt5MDZ8Sv7XFYpX/3P/u5zQiy1PkMSFSz0brRRUfEQxhXLW97FJa7l+bej2HJDt7f9Gvcj+d/fNWC9Z58/GX11kWk4SIXaKotkN+kWn54xGGS7Zvtm86fP59Srt6wlklSsG8mZBF7jVUjyhAgm/V5gDFb2/6jfiwSb2HyJ9/NbhLkWNdwrvpdGZqQlYhnwTfEZdpwizW/Mj3MxP5O31HN45aE0wog0UeWY4gvTl4Ogb6kescizAM6pCff3RBslbFxLdOO7cR17 lzap+rsakey@redhat.com"
 
+packages:
+  - slocate
+  - openssh-clients
+  - acpid
+  - ntp
+  - vim
+  - screen
+  - wget
+  - curl
+  - telnet
+  - rsync
+  - mc
+  - git
+
+# deploy some arbitrary files in this section
+write_files:
+  -
+    path: /root/.terminfo/r/rxvt-unicode-256color
+    permissions: '0644'
+    encoding: gzip
+    content: !!binary |
+      H4sICPxZ5lECA3J4dnQtdW5pY29kZS0yNTZjb2xvcgCtVE1sG1UQnrfPVmgFggNFpQbVoDzUpCTx
+      /vmHJUnzQwhNSgJpRIRblBCnthuv7dhOHDdxIoFQD3Aohx74kcoBoSJAohJIFeKARC9ISJx6ReJS
+      OIDUKwcwM7O7+StFRPCk+d438+Znd+btHhHPw6NwFMrikXBldaXWtVzMz5cyC12GHZ8vFUqV9Z3W
+      aG2h4uaLc4VoPV/LRdEnyk7V6LGZ6Ev5YqZUj041qrUFtwOEgC3xADcQDAIm4R44jJbWHQtEa/Pv
+      7NsrjKcAGoTgEByBx+EJ6ESLDSMwCuMwhXwaziDOQgYWoQRV5A1owmtwkfNeYrwM78IV+BA+g2tw
+      HS034Dv4AW4iuwW/wG/so0SHaLW6hFe3B3cLJcl6rxgSz4kJMS3SYk5khSuqoiE28Ox1lIviLfG2
+      H3dZvCPeF61/XFfEVXFNfCW+Fd+Lm+JH8bO47Uf8Lv4QmtZqtWkHNdL7tAFtXJvQXtBOax+h5WPt
+      E83z/Fz7Qruufa19w/oNxLAkdkDez/shubfqQzKCtqOyta/Vjv4dsnsrypRJ2cvaAOKIbx/bkXVC
+      Tsu0nJNZ6cqqbMhN+cY+a/7b9eY+816S78kP5FX5KcZ9ybEPh5qh3T4/he6MuxX678/6q5/jduhP
+      n90bfiD8YPhwuA3ug0ha5VVZVxlHlQ2VqaDBzCKMRtLGSdzHUE5uez27N2AUDpI3Sr9hF/BzY5LD
+      bQhlYFudRDkFkbOG0waRYzHUbBdBJ+jXY1aKnCyChBuARcDFZjBmEBXX2yp+TIGcCAz2Nzig3861
+      P23EevqIFgDLpR8re0EuvRWaEw4+FOVwTMdybCfupJx43NFjsRiB7nByP/cJlHHYpM5sIFD95Cv0
+      6DqpBqNuMLKDbjHajAnGJGOK/WOEbOaYYZQ4Efb3m9YHkd7g1ScDcioggwE5EZCpgIwHZDggQwE5
+      HRAaSp4aR2AjzG81Z1+NSW7fhQxEEnQR6BFjql+V46rm6MohaiC1PKqrsqnWUU94uoXU9mgCaVI5
+      LvGUquENUQs4a+VAZBQO8L2ByEQdpYGyjLKEUoXZ2bm5c+ey2fPnFxcLBdctFkulcnlpqVKpVmu1
+      5eWVlXp9dbXRuHBhbW19vdnc2Oga6B48PvTkcOyZ3Eie7vPLdGcSOcYC0HRxEhP0Kjxas516RSxJ
+      LEFgEGRockRsAmqiwfM32NngeRo8WoPnb/D8TS8pz95kf9O7L2NeO/G7yrxImYv8YTjGvJ/cTDlW
+      Cu/3Wcvxvr9K9tWnqL1rcds27abqVGs0p6bqUVa3NdNDzb77mXW3s8gZ8Ga1lmiqPhxF2kziTeCa
+      Lg4lbfrHelP1qpqlFlgzWYv7msWa7mtx1kxPy9CUnb01rN01rP+lBj4r/xYYaaA73gR21fR+L/Rb
+      6sT9+CD8BUAi7iSyCAAA
+  -
+    path: /root/.bashrc
+    permissions: '0644'
+    content: |
+      if [ -f /etc/bashrc ]; then
+        . /etc/bashrc
+      fi
+      alias v=vim
+      alias vi=vim
+      alias g=git
+      alias yi="yum install"
+      alias yyi="yum -y install"
+      alias yr="yum remove"
+      alias yu="yum upgrade"
+      alias yyu="yum -y upgrade"
+      alias paste="curl -F 'sprunge=<-' http://sprunge.us"
+      alias ff='cd /usr/share/foreman'
+      alias kk='cd /usr/share/katello'
+      alias ff-run-puppet='echo include foreman_installer | puppet apply -v --modulepath /usr/share/foreman-installer'
+      alias tail-katello='tail -f -n400 /var/log/foreman/production.log'
+      alias tail-katello='tail -f -n400 /var/log/katello/production.log'
+      alias tail-httpd='tail -f -n400 /var/log/httpd/*_log'
+      alias tail-tomcat='tail -f -n400 /var/log/tomcat6/catalina.out'
+      alias tail-pulp='tail -f -n400 /var/log/pulp/pulp.log'
+      alias tail-grinder='tail -f -n400 /var/log/pulp/grinder.log'
+      alias versions='rpm -q foreman foreman-installer katello katello-cli katello-agent pulp candlepin subscription-manager python-rhsm yum'
+      alias errors="grep -iE '(^err|error|fatal|AVC)' /var/log/katello/katello-configure/*log /var/log/katello/*log /var/log/pulp/*log /var/log/tomcat6/catalina.out /var/log/audit/audit.log /var/log/httpd/*log /var/log/foreman/production.log"
+
+runcmd:
+  - updatedb
+
+final_message: "The system is finally up, after $UPTIME seconds"
+
+# for more examples go to http://cloudinit.readthedocs.org/en/latest/topics/examples.html
+# vim: ft=sh:sw=2:ts=2:et:nowrap
