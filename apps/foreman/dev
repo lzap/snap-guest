@@ -1,9 +1,8 @@
 # vim: ft=sh:sw=2:ts=2:et
 # Installs Foreman nightly using snap-guest
 
-
-[ -f /etc/fedora-release ] && OSNV=f$(rpm -q --queryformat '%{VERSION}' fedora-release)
 [ -f /etc/redhat-release ] && OSNV=el$(rpm -q --queryformat '%{VERSION}' redhat-release-server)
+[ -f /etc/fedora-release ] && OSNV=f$(rpm -q --queryformat '%{VERSION}' fedora-release)
 
 yum -y install http://yum.theforeman.org/nightly/$OSNV/x86_64/foreman-release.rpm
 yum -y install foreman-installer

@@ -1,4 +1,5 @@
 #cloud-config
+locale: en_US.UTF-8
 disable_root: 0
 
 ssh_authorized_keys:
