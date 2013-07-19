@@ -40,13 +40,11 @@ And then:
  * git clone git://github.com/lzap/snap-guest.git
  * sudo ln -s $PWD/snap-guest/snap-guest /usr/local/bin/snap-guest
 
-How it works
-------------
-
 There are two ways of using snap-guest: traditional image manipulation and 
 cloud image based snapping.
 
-*Traditional image manipulation*
+Traditional image manipulation
+------------------------------
 
 First of all you need to create base image using any method you want (e.g. 
 virt-manager). It's recommended to use "base" string in the guest name
@@ -90,6 +88,65 @@ The only requirement is the *hostname* - it must be same as the base guest name.
 So if you name the VM fedora-10-base, hostname must be set the same.
 
 The usage is very easy then:
+
+      ./snap-guest --list
+      ./snap-guest -p /mnt/data/images --list-all
+      ./snap-guest -b fedora-17-base -t test-vm -s 4098
+      ./snap-guest -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
+      ./snap-guest -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
+
+Cloud image based snapping
+--------------------------
+
+Don't want to bother preparing base images? Why not to leverage one of these 
+which are already there! http://openstack.redhat.com/Image_resources
+
+Have a working Fedora instance in three simple steps:
+
+    # wget http://cloud.fedoraproject.org/fedora-19.x86_64.qcow2 \
+        -O /var/lib/libvirt/images/f19-base.img
+    # snap-guest -b f19 -t myguest --cloud-image --user-data-ssh
+    # ssh fedora@192.168.122.123
+
+Do you like that? Snap that again, now maybe with custom user data and bridged 
+networking and full hostname with domain. If you don't know cloud-init syntax, 
+read this: https://help.ubuntu.com/community/CloudInit
+
+    # snap-guest -b f19 -t myguest --cloud-image --user-data-file my_app.yaml \
+        --network bridge=br0 --domain xxx.redhat.com --force
+
+Note that you don't need to delete the running host. The --force option will 
+destroy and undefine previous guest automatically.
+
+Now you want to move snap-guest to a server and snap instances from your 
+laptop. Not a problem!
+    
+    # cat my_app.yaml | ssh root@dev-server "snap-guest -b f19 -t myguest \
+        --cloud-image --user-data-stdin -n bridge=br0 -d xxx.redhat.com -f"
+
+And now you want more complex scenario - you want to install things on that 
+instance during start. With cloud-utils tool, you can create multipart user 
+data with bash scripts and other things.
+
+    # write-mime-multipart --output=combined-my_app.yaml \
+        install_software.sh:text/x-shellscript \
+        my_app.yaml
+    # cat my_app.yaml | ssh root@dev-server "snap-guest -b f19 ..."
+
+Of course you can directly pipe the former command into the latter, but we 
+leave this as an exercise.
+
+We ship some example scripts, for example you can install The Foreman 
+application (http://www.theforeman.org) using the following command:
+
+    # vim apps/example.yaml (put your ssh key and review settings)
+    # write-mime-multipart apps/foreman/dev:text/x-shellscript \
+    apps/example.yaml | ssh root@dev-server "snap-guest -b f19 ..."
+
+Usage
+-----
+
+Here you can find all parameters:
 
     usage: ./snap-guest options
 
@@ -147,56 +204,6 @@ The usage is very easy then:
       --user-data-stdin
             Reads cloud-init user-data from standard input
             (overrides all --user-data-* options)
-
-    EXAMPLE:
-
-      ./snap-guest --list
-      ./snap-guest -p /mnt/data/images --list-all
-      ./snap-guest -b fedora-17-base -t test-vm -s 4098
-      ./snap-guest -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
-      ./snap-guest -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
-      echo "my user data" | ./snap-guest -b f19 -t aa --cloud-image --user-data-stdin \
-        -n bridge=br0 -d xxx.redhat.com --domain-prefix 'lzap-' -s 2048 -f
-
-*Cloud image based snapping*
-
-Don't want to bother preparing base images? Why not to leverage one of these 
-which are already there! http://openstack.redhat.com/Image_resources
-
-Have a working Fedora instance in three simple steps:
-
-    # wget http://cloud.fedoraproject.org/fedora-19.x86_64.qcow2 \
-        -O /var/lib/libvirt/images/f19-base.img
-    # snap-guest -b f19 -t myguest --cloud-image --user-data-ssh
-    # ssh fedora@192.168.122.123
-
-Do you like that? Snap that again, now maybe with custom user data and bridged 
-networking and full hostname with domain. If you don't know cloud-init syntax, 
-read this: https://help.ubuntu.com/community/CloudInit
-
-    # snap-guest -b f19 -t myguest --cloud-image --user-data-file my_app.yaml \
-        --network bridge=br0 --domain xxx.redhat.com --force
-
-Note that you don't need to delete the running host. The --force option will 
-destroy and undefine previous guest automatically.
-
-Now you want to move snap-guest to a server and snap instances from your 
-laptop. Not a problem!
-    
-    # cat my_app.yaml | ssh root@dev-server "snap-guest -b f19 -t myguest \
-        --cloud-image --user-data-stdin -n bridge=br0 -d xxx.redhat.com -f"
-
-And now you want more complex scenario - you want to install things on that 
-instance during start. With cloud-utils tool, you can create multipart user 
-data with bash scripts and other things.
-
-    # write-mime-multipart --output=combined-my_app.yaml \
-        install_software.sh:text/x-shellscript \
-        my_app.yaml
-    # cat my_app.yaml | ssh root@dev-server "snap-guest -b f19 ..."
-
-Of course you can directly pipe the former command into the latter, but we 
-leave this as an exercise.
 
 Warning
 -------
