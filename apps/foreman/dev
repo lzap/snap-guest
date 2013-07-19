@@ -6,4 +6,14 @@
 
 yum -y install http://yum.theforeman.org/nightly/$OSNV/x86_64/foreman-release.rpm
 yum -y install foreman-installer
+
+mkdir /etc/foreman-installer
+cat >/etc/foreman-installer/answers.yaml <<EOF
+foreman:
+  repo: nightly
+foreman_proxy:
+  repo: nightly
+puppet: true
+puppetmaster: true
+EOF
 echo include foreman_installer | puppet apply -v --modulepath /usr/share/foreman-installer

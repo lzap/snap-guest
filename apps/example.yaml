@@ -80,7 +80,7 @@ write_files:
       alias errors="grep -iE '(^err|error|fatal|AVC)' /var/log/katello/katello-configure/*log /var/log/katello/*log /var/log/pulp/*log /var/log/tomcat6/catalina.out /var/log/audit/audit.log /var/log/httpd/*log /var/log/foreman/production.log"
 
 runcmd:
-  - "updatedb"
+  - "/usr/bin/updatedb"
 
 final_message: "The system is finally up, after $UPTIME seconds"
 
