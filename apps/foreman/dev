@@ -1,3 +1,4 @@
+#!/bin/bash
 # vim: ft=sh:sw=2:ts=2:et
 # Installs Foreman nightly using snap-guest
 

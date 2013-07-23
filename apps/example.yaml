@@ -22,6 +22,7 @@ packages:
   - rsync
   - mc
   - git
+  - setools-console
 
 # deploy some arbitrary files in this section
 write_files:
