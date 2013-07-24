@@ -11,18 +11,19 @@ ssh_authorized_keys:
 
 packages:
   - mlocate
-  - openssh-clients
-  - acpid
-  - ntp
-  - vim
-  - screen
-  - wget
-  - curl
-  - telnet
-  - rsync
-  - mc
-  - git
-  - setools-console
+  #- openssh-clients
+  #- acpid
+  #- ntp
+  #- vim
+  #- screen
+  #- wget
+  #- curl
+  #- telnet
+  #- rsync
+  #- mc
+  #- git
+  #- setools-console
+  #- policycoreutils-devel
 
 # deploy some arbitrary files in this section
 write_files:

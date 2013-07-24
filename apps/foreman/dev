@@ -8,7 +8,9 @@
 yum -y install http://yum.theforeman.org/nightly/$OSNV/x86_64/foreman-release.rpm
 yum -y install foreman-installer
 
-mkdir /etc/foreman-installer
+service iptables stop
+
+mkdir /etc/foreman-installer 2>/dev/null
 cat >/etc/foreman-installer/answers.yaml <<EOF
 foreman:
   repo: nightly
