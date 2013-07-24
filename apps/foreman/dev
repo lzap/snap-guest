@@ -8,6 +8,8 @@
 yum -y install http://yum.theforeman.org/nightly/$OSNV/x86_64/foreman-release.rpm
 yum -y install foreman-installer
 
+setenforce 0
+
 service iptables stop
 
 mkdir /etc/foreman-installer 2>/dev/null

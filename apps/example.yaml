@@ -83,6 +83,7 @@ write_files:
 
 runcmd:
   - "/usr/bin/updatedb"
+  - "/usr/bin/sepolgen-ifgen"
 
 final_message: "The system is finally up, after $UPTIME seconds"
 
