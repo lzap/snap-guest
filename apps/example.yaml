@@ -1,6 +1,9 @@
 #cloud-config
 locale: en_US.UTF-8
 
+output:
+  all: '| tee -a /var/log/cloud-init-output.log'
+
 # we do not want to disable root because snap-guest is supposed for development
 # (this is not recommended for production deployment of course)
 disable_root: 0
@@ -85,6 +88,7 @@ write_files:
 
 runcmd:
   - "sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
+  - "echo dog8code | passwd --stdin"
   - "/usr/bin/updatedb"
   - "/usr/bin/sepolgen-ifgen"
 
