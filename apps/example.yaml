@@ -7,10 +7,10 @@ disable_root: 0
 
 # this is my own key - replace with yours :-D
 ssh_authorized_keys:
- - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8w6DONv1qn3IdgxSpkYOClq7oe7davWFqKVHPbLoS6+dFInru7gdEO5byhTih6+PwRhHv/b1I+Mtt5MDZ8Sv7XFYpX/3P/u5zQiy1PkMSFSz0brRRUfEQxhXLW97FJa7l+bej2HJDt7f9Gvcj+d/fNWC9Z58/GX11kWk4SIXaKotkN+kWn54xGGS7Zvtm86fP59Srt6wlklSsG8mZBF7jVUjyhAgm/V5gDFb2/6jfiwSb2HyJ9/NbhLkWNdwrvpdGZqQlYhnwTfEZdpwizW/Mj3MxP5O31HN45aE0wog0UeWY4gvTl4Ogb6kescizAM6pCff3RBslbFxLdOO7cR17 lzap+rsakey@redhat.com"
+  - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8w6DONv1qn3IdgxSpkYOClq7oe7davWFqKVHPbLoS6+dFInru7gdEO5byhTih6+PwRhHv/b1I+Mtt5MDZ8Sv7XFYpX/3P/u5zQiy1PkMSFSz0brRRUfEQxhXLW97FJa7l+bej2HJDt7f9Gvcj+d/fNWC9Z58/GX11kWk4SIXaKotkN+kWn54xGGS7Zvtm86fP59Srt6wlklSsG8mZBF7jVUjyhAgm/V5gDFb2/6jfiwSb2HyJ9/NbhLkWNdwrvpdGZqQlYhnwTfEZdpwizW/Mj3MxP5O31HN45aE0wog0UeWY4gvTl4Ogb6kescizAM6pCff3RBslbFxLdOO7cR17 lzap+rsakey@redhat.com"
 
 packages:
-  - mlocate
+  - "mlocate"
   #- openssh-clients
   #- acpid
   #- ntp
@@ -79,9 +79,12 @@ write_files:
       alias tail-pulp='tail -f -n400 /var/log/pulp/pulp.log'
       alias tail-grinder='tail -f -n400 /var/log/pulp/grinder.log'
       alias versions='rpm -q foreman foreman-installer katello katello-cli katello-agent pulp candlepin subscription-manager python-rhsm yum'
-      alias errors="grep -iE '(^err|error|fatal|AVC)' /var/log/katello/katello-configure/*log /var/log/katello/*log /var/log/pulp/*log /var/log/tomcat6/catalina.out /var/log/audit/audit.log /var/log/httpd/*log /var/log/foreman/production.log"
+      alias tail-all='tail -f -n5 $(find /var/log -name \*log)'
+      alias tail-all-errors='tail -f -n5 $(find /var/log -name \*log) | grep -iE "(^err|error|fatal|avc)"'
+      alias auditlast="grep AVC /var/log/audit/audit.log | audit2allow -R"
 
 runcmd:
+  - "sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
   - "/usr/bin/updatedb"
   - "/usr/bin/sepolgen-ifgen"
 
