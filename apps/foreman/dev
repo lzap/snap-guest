@@ -2,15 +2,17 @@
 # vim: ft=sh:sw=2:ts=2:et
 # Installs Foreman nightly using snap-guest
 
+# needed for YUM/RPM scriplets to work correctly
+PATH=$PATH:/usr/bin:/usr/sbin:/bin:/sbin
+
 [ -f /etc/redhat-release ] && OSNV=el$(rpm -q --queryformat '%{VERSION}' redhat-release-server)
 [ -f /etc/fedora-release ] && OSNV=f$(rpm -q --queryformat '%{VERSION}' fedora-release)
 
+setenforce 0
+service iptables stop
+
 yum -y install http://yum.theforeman.org/nightly/$OSNV/x86_64/foreman-release.rpm
 yum -y install foreman-installer
-
-setenforce 0
-
-service iptables stop
 
 mkdir /etc/foreman-installer 2>/dev/null
 cat >/etc/foreman-installer/answers.yaml <<EOF
