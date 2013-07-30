@@ -75,8 +75,8 @@ write_files:
       alias paste="curl -F 'sprunge=<-' http://sprunge.us"
       alias ff='cd /usr/share/foreman'
       alias kk='cd /usr/share/katello'
-      alias ff-run-puppet='echo include foreman_installer | puppet apply -v --modulepath /usr/share/foreman-installer'
-      alias tail-katello='tail -f -n400 /var/log/foreman/production.log'
+      alias puppet-foreman='echo include foreman_installer | puppet apply -v --modulepath /usr/share/foreman-installer'
+      alias tail-foreman='tail -f -n400 /var/log/foreman/production.log'
       alias tail-katello='tail -f -n400 /var/log/katello/production.log'
       alias tail-httpd='tail -f -n400 /var/log/httpd/*_log'
       alias tail-tomcat='tail -f -n400 /var/log/tomcat6/catalina.out'
@@ -90,7 +90,7 @@ write_files:
 runcmd:
   - "/usr/bin/yum -y install mlocate openssh-clients acpid ntp vim screen wget curl telnet rsync mc git setools-console policycoreutils-devel"
   - "/usr/bin/sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
-  - "echo dog8code | /usr/bin/passwd --stdin"
+  - "echo dog8code | /usr/bin/passwd --stdin root"
   - "/usr/bin/updatedb"
   - "/usr/bin/sepolgen-ifgen"
 
