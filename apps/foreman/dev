@@ -3,12 +3,7 @@
 # Installs Foreman nightly using snap-guest
 
 # needed for YUM/RPM scriplets to work correctly
-PATH=$PATH:/usr/bin:/usr/sbin:/bin:/sbin
-
-# WORKAROUNDS
-# F19
-cp /usr/lib/systemd/system/puppetagent.service /etc/systemd/system/puppet.service
-# /WORKAROUNDS
+export PATH=$PATH:/usr/bin:/usr/sbin:/bin:/sbin
 
 [ -f /etc/redhat-release ] && OSNV=el$(rpm -q --queryformat '%{VERSION}' redhat-release-server)
 [ -f /etc/fedora-release ] && OSNV=f$(rpm -q --queryformat '%{VERSION}' fedora-release)
@@ -18,6 +13,11 @@ service iptables stop
 
 rpm -q foreman-release && yum -y install http://yum.theforeman.org/nightly/$OSNV/x86_64/foreman-release.rpm
 rpm -q foreman-installer && yum -y install ruby puppet foreman-installer
+
+# WORKAROUNDS
+# F19
+cp /usr/lib/systemd/system/puppetagent.service /etc/systemd/system/puppet.service
+# /WORKAROUNDS
 
 mkdir /etc/foreman-installer 2>/dev/null
 cat >/etc/foreman-installer/answers.yaml <<EOF

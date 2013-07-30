@@ -12,8 +12,9 @@ disable_root: 0
 ssh_authorized_keys:
   - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8w6DONv1qn3IdgxSpkYOClq7oe7davWFqKVHPbLoS6+dFInru7gdEO5byhTih6+PwRhHv/b1I+Mtt5MDZ8Sv7XFYpX/3P/u5zQiy1PkMSFSz0brRRUfEQxhXLW97FJa7l+bej2HJDt7f9Gvcj+d/fNWC9Z58/GX11kWk4SIXaKotkN+kWn54xGGS7Zvtm86fP59Srt6wlklSsG8mZBF7jVUjyhAgm/V5gDFb2/6jfiwSb2HyJ9/NbhLkWNdwrvpdGZqQlYhnwTfEZdpwizW/Mj3MxP5O31HN45aE0wog0UeWY4gvTl4Ogb6kescizAM6pCff3RBslbFxLdOO7cR17 lzap+rsakey@redhat.com"
 
-packages:
-  - "mlocate"
+# packages does not work on Fedora 19 cloud image
+# packages:
+  #- mlocate
   #- openssh-clients
   #- acpid
   #- ntp
@@ -87,8 +88,9 @@ write_files:
       alias auditlast="grep AVC /var/log/audit/audit.log | audit2allow -R"
 
 runcmd:
-  - "sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
-  - "echo dog8code | passwd --stdin"
+  - "/usr/bin/yum -y install mlocate openssh-clients acpid ntp vim screen wget curl telnet rsync mc git setools-console policycoreutils-devel"
+  - "/usr/bin/sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
+  - "echo dog8code | /usr/bin/passwd --stdin"
   - "/usr/bin/updatedb"
   - "/usr/bin/sepolgen-ifgen"
 
