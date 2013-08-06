@@ -51,6 +51,9 @@ OPTIONS:
         (logfile available in /root/firstboot.log)
   --cloud-image
         Disables image manipulation and enables cloud-init seed via CD-ROM
+  --cloud-preconf
+        Run image manipulation (MAC address, hostname setting, fstab) even
+        when operating in the cloud mode
   --user-data-file [file]
         Reads cloud-init user-data from file
   --user-data-ssh
@@ -102,13 +105,14 @@ ADD_IP=0
 GRAPHICS_OPTS="vnc,listen=0.0.0.0"
 COMMAND=""
 CLOUD=0
+CLOUD_PRECONF=0
 USER_DATA_STDIN=0
 USER_DATA_FILE=""
 USER_DATA_SSH=0
 BOOT_SCRIPTS=()
 BOOT_SCRIPT_PREFIX=""
 
-if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g:i: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,cloud-image,user-data-ssh,user-data-stdin,user-data-file:,boot-script,boot-script-prefix:,help -- "$@"); then
+if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g:i: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,cloud-image,cloud-preconf,user-data-ssh,user-data-stdin,user-data-file:,boot-script,boot-script-prefix:,help -- "$@"); then
   exit 1
 fi
 
@@ -134,6 +138,7 @@ while [ $# -gt 0 ]; do
     --swap|-s) SWAP="$2" ; shift ;;
     --firstboot|-1) COMMAND="$2" ; shift ;;
     --cloud-image) CLOUD=1 ;;
+    --cloud-preconf) CLOUD_PRECONF=1 ;;
     --user-data-stdin) USER_DATA_STDIN=1 ;;
     --user-data-ssh) USER_DATA_SSH=1 ;;
     --user-data-file) USER_DATA_FILE="$2" ; shift ;;
@@ -197,7 +202,7 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 
 # -- Image Manipulation ----------
 
-if [ $CLOUD -eq 0 ]; then
+if [ $CLOUD -eq 0 -o $CLOUD_PRECONF -eq 1 ]; then
   export BASE_IMAGE_DIR COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME
   perl -w "$SCRIPTDIR/prepare-image.pl"
 fi
