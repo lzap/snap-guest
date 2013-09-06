@@ -29,7 +29,7 @@ foreman:
   repo: nightly
 foreman_proxy:
   repo: nightly
-puppet: true
-puppetmaster: true
+puppet:
+  server: true
 EOF
 echo include foreman_installer | puppet apply -v --modulepath /usr/share/foreman-installer
