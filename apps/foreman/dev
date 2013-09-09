@@ -22,9 +22,9 @@ rpm -q foreman-installer || yum -y install ruby puppet foreman-installer
 # F19 - missing service file in puppet
 cp /usr/lib/systemd/system/puppetagent.service /etc/systemd/system/puppet.service
 # Facter fails to parse some values when non-US LANG and others are set
-export LANGUAGE=en_US.UTF-8
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
+export LANGUAGE=C
+export LANG=C
+export LC_ALL=C
 # /WORKAROUNDS
 
 # TODO CUSTOM_REPO env variable
