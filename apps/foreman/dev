@@ -2,6 +2,8 @@
 # vim: ft=sh:sw=2:ts=2:et
 # Installs Foreman nightly using snap-guest
 
+set -x
+
 # needed for YUM/RPM scriplets to work correctly
 export PATH=$PATH:/usr/bin:/usr/sbin:/bin:/sbin
 
@@ -11,25 +13,30 @@ export PATH=$PATH:/usr/bin:/usr/sbin:/bin:/sbin
 setenforce 0
 service iptables stop
 
-[ -f /etc/redhat-release ] && yum -y install http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+rpm -q redhat-release-server && yum -y install http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
 
 rpm -q foreman-release || yum -y install http://yum.theforeman.org/nightly/$OSNV/x86_64/foreman-release.rpm
 rpm -q foreman-installer || yum -y install ruby puppet foreman-installer
 
 # WORKAROUNDS
-# F19
+# F19 - missing service file in puppet
 cp /usr/lib/systemd/system/puppetagent.service /etc/systemd/system/puppet.service
+# Facter fails to parse some values when non-US LANG and others are set
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 # /WORKAROUNDS
 
 # TODO CUSTOM_REPO env variable
 
-mkdir /etc/foreman-installer 2>/dev/null
-cat >/etc/foreman-installer/answers.yaml <<EOF
-foreman:
-  repo: nightly
-foreman_proxy:
-  repo: nightly
-puppet:
-  server: true
-EOF
-echo include foreman_installer | puppet apply -v --modulepath /usr/share/foreman-installer
+#mkdir /etc/foreman-installer 2>/dev/null
+#cat >/etc/foreman-installer/answers.yaml <<EOF
+#foreman:
+  #repo: nightly
+#foreman_proxy:
+  #repo: nightly
+#puppet:
+  #server: true
+#EOF
+#echo include foreman_installer | puppet apply -v --modulepath /usr/share/foreman-installer
+foreman-install --foreman-repo nightly --foreman-proxy-repo nightly -v

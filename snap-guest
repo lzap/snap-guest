@@ -8,7 +8,7 @@ Tool for ultra-fast copy-on-write image provisioning. Prepare a base image (or
 download a cloud image) and then spawn an COW instance. Then again, and again.
 
 OPTIONS:
-  --help | -h             
+  --help | -h
         Show this message
   --list | -l
         List avaiable images (with "base" in the name)
