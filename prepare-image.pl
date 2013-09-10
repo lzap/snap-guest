@@ -49,7 +49,7 @@ print "Configuring /etc/hosts file\n";
 $file = "/etc/hosts";
 $content = $g->read_file ($file);
 $content =~ s/$ENV{SOURCE_NAME}/localbox/g;
-$content .= "\n127.0.0.1 $ENV{TARGET_NAME} $ENV{TARGET_HOSTNAME}\n";
+$content .= "\n127.0.0.1 $ENV{TARGET_HOSTNAME} $ENV{TARGET_NAME}\n";
 $g->write ($file, $content);
 
 if ($distro eq "debian" || $distro eq "ubuntu") {
