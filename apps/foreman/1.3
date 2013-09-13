@@ -15,7 +15,8 @@ service iptables stop
 
 rpm -q redhat-release-server && yum -y install http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
 
-rpm -q foreman-release || yum -y install http://yum.theforeman.org/rc/$OSNV/x86_64/foreman-release.rpm
+yum -y install http://koji.katello.org/releases/yum/foreman-1.3/RHEL/6Server/x86_64/foreman-release-1.3.0-0.1.RC1.el6.noarch.rpm
+#rpm -q foreman-release || yum -y install http://yum.theforeman.org/rc/$OSNV/x86_64/foreman-release.rpm
 rpm -q foreman-installer || yum -y install ruby puppet foreman-installer
 
 # WORKAROUNDS

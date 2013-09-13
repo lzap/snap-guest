@@ -63,7 +63,7 @@ write_files:
       if [ -f /etc/bashrc ]; then
         . /etc/bashrc
       fi
-      alias tt='tail -f /var/log/cloud-init.log -n500'
+      alias tt='tail -f /var/log/cloud-init-output.log -n500'
       alias te="tail -f /var/log/cloud-init.log -n900 | grep -iE '(ERR|WARN)'"
       alias v=vim
       alias g=git
