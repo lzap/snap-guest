@@ -1,0 +1,32 @@
+#!/bin/bash
+# vim: ft=sh:sw=2:ts=2:et
+# Installs Foreman nightly using snap-guest
+
+set -x
+
+# needed for YUM/RPM scriplets to work correctly
+export PATH=$PATH:/usr/bin:/usr/sbin:/bin:/sbin
+
+[ -f /etc/redhat-release ] && OSNV=el$(rpm -q --queryformat '%{RELEASE}' redhat-release-server | awk -F. '{print $1}')
+[ -f /etc/fedora-release ] && OSNV=f$(rpm -q --queryformat '%{VERSION}' fedora-release)
+
+setenforce 0
+service iptables stop
+
+rpm -q redhat-release-server && yum -y install http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+
+rpm -q foreman-release || yum -y install http://yum.theforeman.org/rc/$OSNV/x86_64/foreman-release.rpm
+rpm -q foreman-installer || yum -y install ruby puppet foreman-installer
+
+# WORKAROUNDS
+# F19 - missing service file in puppet
+cp /usr/lib/systemd/system/puppetagent.service /etc/systemd/system/puppet.service
+# RHEL6/F19 - facter fails to parse some values when non-US LANG and others are set - http://projects.puppetlabs.com/issues/12012
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+# /WORKAROUNDS
+
+# TODO CUSTOM_REPO env variable
+
+foreman-install --foreman-repo nightly --foreman-proxy-repo nightly -v
