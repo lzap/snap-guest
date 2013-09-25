@@ -11,15 +11,15 @@ Upstream site is at http://github.com/lzap/snap-guest
 Features
 --------
 
- * easy-to-learn (hard-to-master) CLI
+ * easy-to-learn CLI
  * creates qcow2 image based on different one
  * creates and provisions guest using virt-install
 
 Traditional image manipulation features:
 
- * generates MAC address out of hostname
+ * generates MAC address out of hostname (more bellow)
  * modifies network settings (MAC, hostname) for Fedora/Red Hat distros
- * disables fsck check during boot (qcow2 images can have lost inodes)
+ * disables fsck check during boot
 
 Cloud image-based provisioning features:
 
