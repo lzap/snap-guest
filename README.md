@@ -242,6 +242,14 @@ assign it the very same IP address. You can keep hostnames and IPs in the
 /etc/hosts file and if you won't be shut down your guests for longer periods, 
 IPs never change.
 
+It is also possible to provision guests with static network settings. It is 
+currently available for Fedora and Red Hats. Example options:
+
+    snap-guest ... \
+        --static-ipaddr 192.168.100.2 \
+        --static-netmask 255.255.255.0 \
+        --static-gateway 192.168.100.1
+
 Additionally, if you use snap-guest on the same host where KVM is running, 
 there is a flag that adds entries to your /etc/hosts automatically. See help 
 section for more details.

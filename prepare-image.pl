@@ -63,8 +63,9 @@ elsif ($distro =~ m/^(fedora|rhel|redhat-based|centos|scientificlinux)$/) {
     print "Setting static network configuration\n";
     $content = "DEVICE=eth0\n";
     $content .= "ONBOOT=yes\n";
-    $content .= "BOOTPROTO=STATIC\n";
+    $content .= "BOOTPROTO=static\n";
     $content .= "NM_CONTROLLED=no\n";
+    $content .= "HWADDR=$ENV{MAC}\n";
     $content .= "IPADDR=$ENV{STATIC_IPADDR}\n";
     $content .= "NETMASK=$ENV{STATIC_NETMASK}\n";
     $content .= "GATEWAY=$ENV{STATIC_GATEWAY}\n";
