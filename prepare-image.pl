@@ -42,7 +42,7 @@ $content =~ s/[0-9]$/0/g;
 $g->write ($file, $content);
 
 print "Configuring message of the day\n";
-$content = "\n\nSnap-guest box from $ENV{BASE_IMAGE} on " . `date` . "\n\n";
+$content = "\n\nSnap-guest box from $ENV{SOURCE_NAME} on " . `date` . "\n\n";
 $g->write ("/etc/motd", $content);
 
 print "Configuring /etc/hosts file\n";

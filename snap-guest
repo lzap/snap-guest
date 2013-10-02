@@ -203,7 +203,7 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 # -- Image Manipulation ----------
 
 if [ $CLOUD -eq 0 -o $CLOUD_PRECONF -eq 1 ]; then
-  export BASE_IMAGE COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME
+  export COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME
   perl -w "$SCRIPTDIR/prepare-image.pl"
 fi
 
