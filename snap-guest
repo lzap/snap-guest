@@ -35,16 +35,16 @@ OPTIONS:
   --domain-prefix [prefix]
         Domain prefix like "test-" -> "test-NAME.lan" (default: none)
   --force | -f
-        Force creating new guest (no questions, destroys one the same name)
+        Force creating new guest (destroy existing, no questions, DANGEROUS!)
   --add-ip | -w
-        Add IP address to /etc/hosts (works only with NAT)
+        Add IP address to /etc/hosts on the host machine (works only with NAT)
   --graphics [opts] | -g [opts]
         Graphics options passed to virt-install via --graphics
         (default is vnc,listen=0.0.0.0)
   --swap [MBs] | -s [MBs]
-        Creates RAW disk and connects and mounts it of given size (in MB)
-        Note the virtual disc has no parititions.
-        For cloud-image provisioning swap is not turned on automatically and
+        Creates RAW disk and connects and mounts it as swap of given size.
+        The created virtual disc is NOT parititioned (it is used raw).
+        For cloud-image provisioning swap is created but ignored and
         you need to do this manually in user-data script (swapon /dev/vdb).
   --firstboot [command] | -1 [command]
         Command to execute during first boot in /root dir
