@@ -29,14 +29,5 @@ export LC_ALL=en_US.UTF-8
 
 # TODO CUSTOM_REPO env variable
 
-#mkdir /etc/foreman-installer 2>/dev/null
-#cat >/etc/foreman-installer/answers.yaml <<EOF
-#foreman:
-  #repo: nightly
-#foreman_proxy:
-  #repo: nightly
-#puppet:
-  #server: true
-#EOF
-#echo include foreman_installer | puppet apply -v --modulepath /usr/share/foreman-installer
-foreman-install --foreman-repo nightly --foreman-proxy-repo nightly -v
+foreman-installer --foreman-repo nightly --foreman-proxy-repo nightly -v
+foreman-installer --foreman-repo nightly --foreman-proxy-repo nightly -v
