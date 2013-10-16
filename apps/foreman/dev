@@ -4,8 +4,11 @@
 
 set -x
 
-# needed for YUM/RPM scriplets to work correctly
+# needed for YUM/RPM scriplets to work correctly (maybe)
 export PATH=$PATH:/usr/bin:/usr/sbin:/bin:/sbin
+
+CMD="foreman-installer --foreman-repo nightly --foreman-proxy-repo nightly -v"
+echo "alias fi='$CMD'" >> /root/.bashrc
 
 [ -f /etc/redhat-release ] && OSNV=el$(rpm -q --queryformat '%{RELEASE}' redhat-release-server | awk -F. '{print $1}')
 [ -f /etc/fedora-release ] && OSNV=f$(rpm -q --queryformat '%{VERSION}' fedora-release)
@@ -27,7 +30,4 @@ export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 # /WORKAROUNDS
 
-# TODO CUSTOM_REPO env variable
-
-foreman-installer --foreman-repo nightly --foreman-proxy-repo nightly -v
-foreman-installer --foreman-repo nightly --foreman-proxy-repo nightly -v
+$CMD; $CMD
