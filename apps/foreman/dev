@@ -19,7 +19,7 @@ service iptables stop
 rpm -q redhat-release-server && yum -y install http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
 
 rpm -q foreman-release || yum -y install http://yum.theforeman.org/nightly/$OSNV/x86_64/foreman-release.rpm
-rpm -q foreman-installer || yum -y install ruby puppet foreman-installer
+rpm -q foreman-installer || yum -y install ruby puppet foreman-installer foreman-cli foreman-console foreman-libvirt foreman-ovirt foreman-vmware
 
 # WORKAROUNDS
 # F19 - missing service file in puppet
