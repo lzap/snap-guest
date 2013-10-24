@@ -93,6 +93,7 @@ runcmd:
   - "echo dog8code | /usr/bin/passwd --stdin root"
   - "/usr/bin/updatedb"
   - "/usr/bin/sepolgen-ifgen"
+  - "test -f /dev/vdb && swapon /dev/vdb"
 
 final_message: "The system is finally up, after $UPTIME seconds"
 
