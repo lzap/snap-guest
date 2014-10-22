@@ -77,7 +77,7 @@ elsif ($distro =~ m/^(fedora|rhel|redhat-based|centos|scientificlinux)$/) {
   $g->write ($file, $content);
 
   print "Setting hostname\n";
-  if ($major >= 18 || ($distro eq "rhel" && $major >= 7)) {
+  if ($major >= 18 || ($distro eq "rhel" || $distro eq "centos") && $major >= 7) {
     $g->write ("/etc/hostname", $ENV{TARGET_HOSTNAME});
   } else {
     $file = "/etc/sysconfig/network";
