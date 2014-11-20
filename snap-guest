@@ -71,6 +71,8 @@ OPTIONS:
         It is possible to configure static network setup (only Fedora/RHEL).
   --static-gateway
         It is possible to configure static network setup (only Fedora/RHEL).
+  --cpu-feature
+        Configure the CPU model and CPU features exposed to the guest.
 
 EXAMPLE:
 
@@ -120,8 +122,9 @@ BOOT_SCRIPT_PREFIX=""
 STATIC_IPADDR=""
 STATIC_NETMASK=""
 STATIC_GATEWAY=""
+CPU_FEATURE=""
 
-if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g:i: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,cloud-image,cloud-preconf,user-data-ssh,user-data-stdin,user-data-file:,boot-script,boot-script-prefix:,static-ipaddr:,static-netmask:,static-gateway:,help -- "$@"); then
+if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g:i: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,cloud-image,cloud-preconf,user-data-ssh,user-data-stdin,user-data-file:,boot-script,boot-script-prefix:,static-ipaddr:,static-netmask:,static-gateway:,cpu-feature:,help -- "$@"); then
   exit 1
 fi
 
@@ -156,6 +159,7 @@ while [ $# -gt 0 ]; do
     --static-ipaddr) STATIC_IPADDR="$2" ; shift ;;
     --static-netmask) STATIC_NETMASK="$2" ; shift ;;
     --static-gateway) STATIC_GATEWAY="$2" ; shift ;;
+    --cpu-feature) CPU_FEATURE="--cpu=$2" ; shift ;;
     --help|-h) usage;  exit ;;
     (--) shift; break;;
     (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
@@ -284,6 +288,7 @@ virt-install --vcpus $CPUS \
   --graphics "$GRAPHICS_OPTS" \
   --noautoconsole --force \
   --network=$NETWORK,mac=$MAC \
+  $CPU_FEATURE
   $NETWORK2
 
 # -- IP Determining -------------
