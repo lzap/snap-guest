@@ -288,8 +288,8 @@ virt-install --vcpus $CPUS \
   --graphics "$GRAPHICS_OPTS" \
   --noautoconsole --force \
   --network=$NETWORK,mac=$MAC \
+  $NETWORK2 \
   $CPU_FEATURE
-  $NETWORK2
 
 # -- IP Determining -------------
 # TODO: Use this instead: http://rwmj.wordpress.com/2010/10/26/tip-find-the-ip-address-of-a-virtual-machine/
