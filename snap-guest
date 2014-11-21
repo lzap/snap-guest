@@ -184,6 +184,8 @@ SOURCE_IMG=$(ls -v1 $BASE_IMAGE_DIR/${SOURCE_NAME}*.img | tail -n1)
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
 TARGET_IMG_SWAP=$IMAGE_DIR/$TARGET_NAME-swap.img
 MAC="52:54:00$(echo "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
+# prepend a "2" to make the second mac different than the first but still consistent across runs
+MAC2="52:54:00$(echo "2$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
 TARGET_HOSTNAME="$PREFIX$TARGET_NAME$DOMAIN"
 
 if [ ! -f "$SOURCE_IMG" ]; then
@@ -215,7 +217,7 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 # -- Image Manipulation ----------
 
 if [ $CLOUD -eq 0 -o $CLOUD_PRECONF -eq 1 ]; then
-  export COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME \
+  export COMMAND TARGET_HOSTNAME MAC NETWORK2 MAC2 SOURCE_NAME SWAP TARGET_IMG TARGET_NAME \
     STATIC_IPADDR STATIC_NETMASK STATIC_GATEWAY
   perl -w "$SCRIPTDIR/prepare-image.pl"
 fi
@@ -277,14 +279,24 @@ echo "CPUs:     $CPUS"
 echo "Memory:   $MEM MB"
 echo "Swap:     $MEM MB"
 echo "MAC:      $MAC"
-virt-install --vcpus $CPUS \
-  --ram $MEM --import \
-  --name $TARGET_NAME \
-  --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP $DISK_SEED \
-  --graphics "$GRAPHICS_OPTS" \
-  --noautoconsole --force \
-  --network=$NETWORK,mac=$MAC \
-  $NETWORK2
+if [ $NETWORK2 ]; then
+  echo "MAC2:     $MAC2"
+fi
+
+VIRT_CMD="
+  virt-install --vcpus $CPUS \
+    --ram $MEM --import \
+    --name $TARGET_NAME \
+    --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP $DISK_SEED \
+    --graphics "$GRAPHICS_OPTS" \
+    --noautoconsole --force \
+    --network=$NETWORK,mac=$MAC
+"
+
+if [ $NETWORK2 ]; then
+  VIRT_CMD="$VIRT_CMD  $NETWORK2,mac=$MAC2"
+fi
+eval $VIRT_CMD
 
 # -- IP Determining -------------
 # TODO: Use this instead: http://rwmj.wordpress.com/2010/10/26/tip-find-the-ip-address-of-a-virtual-machine/

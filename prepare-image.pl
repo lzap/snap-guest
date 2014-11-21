@@ -76,6 +76,15 @@ elsif ($distro =~ m/^(fedora|rhel|redhat-based|centos|scientificlinux)$/) {
   }
   $g->write ($file, $content);
 
+  if($ENV{NETWORK2}) {
+      print "setting eth1\n";
+      # static config not supported here yet
+      $file = "/etc/sysconfig/network-scripts/ifcfg-eth1";
+      $content = $g->read_file ($file);
+      $content =~ s/HWADDR=.*/HWADDR=$ENV{MAC2}/g;
+      $g->write ($file, $content);
+  }
+
   print "Setting hostname\n";
   if ($major >= 18 || ($distro eq "rhel" || $distro eq "centos") && $major >= 7) {
     $g->write ("/etc/hostname", $ENV{TARGET_HOSTNAME});
