@@ -8,6 +8,9 @@ involved, no magic.
 
 Upstream site is at http://github.com/lzap/snap-guest
 
+Maintainers needed! I no longer actively use the script as I found 
+`virt-builder` a nicer tool to build VMs. It's a bit slower but very flexible.
+
 Features
 --------
 
