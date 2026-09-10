@@ -1,105 +1,89 @@
-Quick provision script snap-guest for QEMU/KVM
-==============================================
+# Quick provision script snap-guest for QEMU/KVM
 
 Snap-guest is a simple script for creating copy-on-write QEMU/KVM guests.
 
-Fedora KVM instance booted into working shell in 2 seconds? No containers 
-involved, no magic.
+## Features
 
-Upstream site is at http://github.com/lzap/snap-guest
+Before you start, you need to have a base qcow2 image customized to your needs
+(updated, passwords set, SSH keys, sofware installed). The README will describe
+how to easily do this with `virt-install`.
 
-Maintainers needed! I no longer actively use the script as I found 
-`virt-builder` a nicer tool to build VMs. It's a bit slower but very flexible.
-
-Features
---------
-
- * easy-to-learn CLI
- * creates qcow2 image based on different one
- * creates and provisions guest using virt-install
+ * CLI
+ * creates a derived qcow2 image
+ * starts a VM using virt-install
 
 Traditional image manipulation features:
 
- * generates MAC address out of hostname (more bellow)
+ * generates MAC address out of hostname for consistent IP
  * modifies network settings (MAC, hostname) for Fedora/Red Hat distros
  * disables fsck check during boot
 
-Cloud image-based provisioning features:
+## Installation
 
- * generate simple meta-data (uuid = hostname)
- * generate trivial user-data (enable root login, use user's RSA public key)
- * allows user to pass own user-data
+Dependencies for Red Hat systems:
 
-Installation
-------------
-
-Dependencies for RHEL6/Fedora:
-
- * yum -y install bash sed python-virtinst qemu-img libguestfs-mount \
-    perl perl-Sys-Guestfs kvm cloud-utils openssl util-linux genisoimage
+ * dnf -y install bash sed python-virtinst qemu-img libguestfs-mount \
+    perl perl-Sys-Guestfs kvm openssl util-linux genisoimage
 
 And then:
 
- * git clone git://github.com/lzap/snap-guest.git
+ * git clone https://github.com/lzap/snap-guest
  * sudo ln -s $PWD/snap-guest/snap-guest /usr/local/bin/snap-guest
 
-There are two ways of using snap-guest: traditional image manipulation and 
-cloud image based snapping.
+## Base image creation
 
-Traditional image manipulation
-------------------------------
-
-First of all you need to create base image using any method you want (e.g. 
-virt-manager). It's recommended to use "base" string in the guest name
-(e.g. fedora-10-base or rhel4-base) to differentiate those files (snap-guest
-lists them using -l option), but it is not mandatory (option -a lists them 
-all). The template image format can be qcow2 as well as different one (raw on 
-LVM for example).
-
-Feel free to configure the base image according to your needs. It's recommended
-to install a few packages like ntpd or acpid. Make sure network is also on when
-switching off NetworkManager. The following blog post contains more information 
-about configuring base (or "template") guest:
-
-http://lukas.zapletalovi.com/2011/08/configure-red-hat-or-fedora-as-guest.html
-
-I also recommend to configure serial console for both terminal and grub. There
-is a simple way to do that, for example for Fedora you need to do this:
-
-    cat >> /etc/default/grub <<'EOF'
-    GRUB_TIMEOUT=1
-    GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX text console=tty0 console=ttyS0,115200n8"
-    GRUB_TERMINAL=serial
-    GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"
-    EOF
-    grub2-mkconfig -o /boot/grub2/grub.cfg
-
-Then it is possible to connect to the console with:
-
-    virsh console guestname
-
-There is a gist with several other extra commands from the above blog post:
-https://gist.github.com/lzap/4984838
-
-To use it do this:
-
-    # \curl -L https://gist.github.com/lzap/4984838/raw | bash -xs
-
-*Important note*
+Before you can do anything, a base image must exist. It's recommended to use
+"base" string in the guest name (e.g. fedora-10-base or rhel4-base) to
+differentiate those files (snap-guest lists them using -l option), but it is
+not mandatory (option -a lists them all). The base image does not have to be
+qcow2! You can use RAW image as well, however, testing showed that there is no
+measurable benefit from using RAW images, especially when using `unsafe`.
 
 The only requirement is the *hostname* - it must be same as the base guest name.
-So if you name the VM fedora-10-base, hostname must be set the same.
+So if you name the VM fedora-10-base, hostname must be set the same without any
+domain.
+
+To create a base image, use `virt-builder` which can download and preare wide
+variety of OS images (Fedora, CentOS, Debian, Ubuntu). It creates either
+uncompressed qcow2 images or (sparse) RAW images. Since for snap-guest,
+compressed qcow2 makes a lot of sense, create intermediate RAW image first:
+
+# centosstream-9
+
+    OS=rhel-9.8
+    virt-builder "$OS" \
+        --output "/scratch/images/$OS-base.raw" \
+        --format raw \
+        --size "100G" \
+        --root-password password:redhat \
+        --run-command 'useradd -m lzap' \
+        --ssh-inject "root:file:$HOME/.ssh/id_ed25519.pub" \
+        --ssh-inject "lzap:file:$HOME/.ssh/id_ed25519.pub" \
+        --hostname "$OS-base" \
+        --update \
+        --install vim
+
+Note the image size is 100GB, but thanks to spare support in Linux, the image
+will actually take just few hundreds MBs. Now, convert it to compressed qcow2:
+
+    qemu-img convert -c -O qcow2 -o compression_type=zstd \
+        "/scratch/images/$OS-base.raw" \
+        "/scratch/images/$OS-base.qcow2" && \
+        rm "/scratch/images/$OS-base.raw"
+
+Note for Red Hat associates: You can configure `virt-builder` with internal
+repository which carries all RHEL versions available to date.
+
+Usage
+-----
 
 The usage is very easy then:
 
       ./snap-guest --list
-      ./snap-guest -p /mnt/data/images --list-all
+      ./snap-guest -p /scratch/images --list-all
       ./snap-guest -b fedora-17-base -t test-vm -s 4098
       ./snap-guest -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
       ./snap-guest -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
-
-Usage
------
 
 Here you can find all parameters:
 
@@ -109,7 +93,7 @@ Here you can find all parameters:
     download a cloud image) and then spawn an COW instance. Then again, and again.
 
     OPTIONS:
-      --help | -h             
+      --help | -h
             Show this message
       --list | -l
             List avaiable images (with "base" in the name)
@@ -160,44 +144,30 @@ Here you can find all parameters:
             Reads cloud-init user-data from standard input
             (overrides all --user-data-* options)
 
-Warning
--------
+## Do not start base images
 
-There is one **important thing** you need to know. Once you have some guests, 
-you **must not start** template (base) image, because that would break the 
+There is one **important thing** you need to know. Once you have some guests,
+you **must not start** template (base) image, because that would break the
 "child" guests.
-
-You also **must not** change a template even when the "child" guests are 
-_not_ running. Again, if anything changes in a template, images based on the 
-template will be corrupted. Sooner or later.
-
-Trust me, it can seem to work since there is lot of files in a modern 
-distribution (even a minimal installation). But the probability you corrupt 
-some important files is very high. The template must not change when there are 
-"child" guests - never ever.
-
-The only safe way to change something in a template is to **destroy** all the 
-"child" guests, change it and then re-provision them again. It's not big deal - 
-it is fast, you know.
 
 Network
 -------
 
-The script modifies network settings in /etc/sysconfig directory (hostname and 
-MAC address of the eth0). The MAC address is generated based on the hostname - 
+The script modifies network settings in /etc/sysconfig directory (hostname and
+MAC address of the eth0). The MAC address is generated based on the hostname -
 the same hostname always gives the same address. Example:
 
     hostname a => mac 52:54:00:60:b7:25
     hostname b => mac 52:54:00:3b:5d:5c
     hostname a => mac 52:54:00:60:b7:25 (the same)
 
-This is great for testing - when you provision a box called let's say "test" 
-and delete it, once it is provisioned again with the same name, DHCP will 
-assign it the very same IP address. You can keep hostnames and IPs in the 
-/etc/hosts file and if you won't be shut down your guests for longer periods, 
+This is great for testing - when you provision a box called let's say "test"
+and delete it, once it is provisioned again with the same name, DHCP will
+assign it the very same IP address. You can keep hostnames and IPs in the
+/etc/hosts file and if you won't be shut down your guests for longer periods,
 IPs never change.
 
-It is also possible to provision guests with static network settings. It is 
+It is also possible to provision guests with static network settings. It is
 currently available for Fedora and Red Hats. Example options:
 
     snap-guest ... \
@@ -205,38 +175,16 @@ currently available for Fedora and Red Hats. Example options:
         --static-netmask 255.255.255.0 \
         --static-gateway 192.168.100.1
 
-Additionally, if you use snap-guest on the same host where KVM is running, 
-there is a flag that adds entries to your /etc/hosts automatically. See help 
+Additionally, if you use snap-guest on the same host where KVM is running,
+there is a flag that adds entries to your /etc/hosts automatically. See help
 section for more details.
 
-Recommended disk layout
------------------------
-
-Since snap-guest does not support LVM, you have to rely on the formatted 
-partition. It is recommended to use separate dedicated partition for 
-snap-guest. I am happy with ext4 using the extent option enabled and a
-bigger block size. Something like:
-
-    # pvdisplay
-    # lvdisplay
-    # lvcreate -L 140G -n lv_images vg_myhost
-    # mkfs.ext4 -b 4096 -O extent /dev/mapper/vg_myhost-lv_images
-
-So
---
-
-Snap-guest is a great tool for developing or testing. It's simple and fast.
-
-Credits and license
--------------------
+## Credits and license
 
 The script is distributed as public domain.
 
 Original script was written by Red Hat folks (Jason Dobies, Shannon Hughes,
-Mike McCune and others), I have slightly modified it, I was using it and after 
-few improvements I decided to share it with the world.
+Mike McCune and others).
 
-Special thanks to all who improve this set of scripts. See AUTHORS for full 
+Special thanks to all who improve this set of scripts. See AUTHORS for full
 list.
-
-vim: tw=79:fo+=w
