@@ -1,197 +1,126 @@
-# Quick provision script snap-guest for QEMU/KVM
+# snap-guest
 
-Snap-guest is a simple script for creating copy-on-write QEMU/KVM guests.
+`snap-guest` creates a qcow2 overlay and runs it through the unprivileged
+`qemu:///session` libvirt connection. It uses rootless `passt` user-mode
+networking and forwards deterministic TCP ports to the guest.
 
-## Features
+After the guest is reachable, the tool sets the target hostname over SSH,
+reboots the guest, and waits until SSH is available again. Thanks to DHCP/DNS
+integration in libvirt the host is accessible via DNS.  It never mounts or
+modifies the base image.
 
-Before you start, you need to have a base image named with either an `.img` or
-`.qcow2` extension and customized to your needs (updated, passwords set, SSH
-keys, sofware installed). The README will describe
-how to easily do this with `virt-install`.
+By default, snap-guest forwards guest TCP ports `22`, `80`, `443`, and `3000`.
+Use `--ports` to provide a comma-separated replacement list. Each host port is
+derived from the KVM host name, target name, and guest port, so it is stable for
+that target on the same host. By default, forwards listen only on `127.0.0.1`.
+Use `--bind-all` to expose them on all host addresses; the output then uses the
+target name in the URLs. Configure that name in DNS to resolve to the KVM host.
 
- * CLI
- * creates a derived qcow2 image
- * starts a VM using virt-install
+When provisioning finishes, snap-guest maintains its host aliases in
+`~/.ssh/config-snap-guest`. To use those aliases, add this line to your SSH
+configuration yourself:
 
-Traditional image manipulation features:
+    Include ~/.ssh/config-snap-guest
 
- * generates MAC address out of hostname for consistent IP
- * modifies network settings (MAC, hostname) for Fedora/Red Hat distros
- * disables fsck check during boot
+Thus the target can be used directly with SSH, without remembering its
+forwarded port:
+
+    ssh root@foreman.example.com
+
+## Base-image contract
+
+The base image must be a `.qcow2` file and must already contain:
+
+* a running SSH server listening on port 22;
+* the public SSH key of the user running `snap-guest`, or of the user supplied
+  with `--ssh-user`;
+* passwordless `sudo` for that user, unless it is `root`;
+* `systemd` with `hostnamectl` and `systemctl` available.
+
+The target name is also the hostname. A fully-qualified target name is allowed,
+but rootless user-mode networking does not provide shared guest DNS.
 
 ## Installation
 
-Dependencies for Red Hat systems:
+On Red Hat systems:
 
- * dnf -y install bash sed python-virtinst qemu-img libguestfs-mount \
-    perl perl-Sys-Guestfs kvm openssl util-linux
+    dnf install bash coreutils libguestfs-tools openssh-clients openssl passt \
+        qemu-img python-virtinst
 
-And then:
+By default, snap-guest reads and creates images in the user-session libvirt
+image directory:
 
- * git clone https://github.com/lzap/snap-guest
- * sudo ln -s $PWD/snap-guest/snap-guest /usr/local/bin/snap-guest
+    ~/.local/share/libvirt/images
+
+Run the script directly, or add a user-local symlink to your PATH:
+
+    mkdir -p ~/.local/bin
+    ln -s "$PWD/snap-guest" ~/.local/bin/snap-guest
 
 ## Base image creation
 
-Before you can do anything, a base image must exist. It's recommended to use
-"base" string in the guest name (e.g. fedora-10-base or rhel4-base) to
-differentiate those files (snap-guest lists them using -l option), but it is
-not mandatory (`--list-all` lists them all). The base image does not have to be
-qcow2: a raw image named with an `.img` extension also works. However, testing
-showed that there is no measurable benefit from using raw images, especially
-when using `unsafe`.
+Create a base image for your chosen distribution, then convert it to qcow2.
+Configure an SSH account, its authorized key, and passwordless sudo as part of
+the image build. This generic example uses a `testuser` account:
 
-The only requirement is the *hostname* - it must be same as the base guest name.
-So if you name the VM fedora-10-base, hostname must be set the same without any
-domain.
-
-To create a base image, use `virt-builder` which can download and preare wide
-variety of OS images (Fedora, CentOS, Debian, Ubuntu). It creates either
-uncompressed qcow2 images or (sparse) RAW images. Since for snap-guest,
-compressed qcow2 makes a lot of sense, create intermediate RAW image first:
-
-# centosstream-9
-
-    OS=rhel-9.8
+    OS=your-os
+    IMAGE_DIR="$HOME/.local/share/libvirt/images"
+    SSH_USER=testuser
+    mkdir -p "$IMAGE_DIR"
     virt-builder "$OS" \
-        --output "/scratch/images/$OS-base.raw" \
+        --output "$IMAGE_DIR/$OS-base.raw" \
         --format raw \
-        --size "100G" \
-        --root-password password:redhat \
-        --run-command 'useradd -m lzap' \
-        --ssh-inject "root:file:$HOME/.ssh/id_ed25519.pub" \
-        --ssh-inject "lzap:file:$HOME/.ssh/id_ed25519.pub" \
-        --hostname "$OS-base" \
-        --update \
-        --install vim
-
-Note the image size is 100GB, but thanks to spare support in Linux, the image
-will actually take just few hundreds MBs. Now, convert it to compressed qcow2:
+        --size 100G \
+        --run-command "useradd -m $SSH_USER" \
+        --run-command "echo '$SSH_USER ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/$SSH_USER" \
+        --run-command "chmod 0440 /etc/sudoers.d/$SSH_USER" \
+        --ssh-inject "$SSH_USER:file:$HOME/.ssh/id_ed25519.pub" \
+        --hostname "$OS-base"
 
     qemu-img convert -c -O qcow2 -o compression_type=zstd \
-        "/scratch/images/$OS-base.raw" \
-        "/scratch/images/$OS-base.qcow2" && \
-        rm "/scratch/images/$OS-base.raw"
+        "$IMAGE_DIR/$OS-base.raw" \
+        "$IMAGE_DIR/$OS-base.qcow2"
 
-Note for Red Hat associates: You can configure `virt-builder` with internal
-repository which carries all RHEL versions available to date.
+To list supported OSes:
 
-Usage
------
+    virt-builder --list
 
-The usage is very easy then:
+The base image can be also installed by regular OS installation, just make sure
+to use qcow2 backend.
 
-      ./snap-guest --list
-      ./snap-guest -p /scratch/images --list-all
-      ./snap-guest -b fedora-17-base -t test-vm -s 4098
-      ./snap-guest -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
-      ./snap-guest -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
+## Usage
 
-Here you can find all parameters:
+    snap-guest --list
+    snap-guest -b your-os-base -t foreman.example.com --ssh-user testuser
+    snap-guest -b your-os-base -t satellite.example.com --ssh-user root
+    snap-guest -b your-os-base -t web-test --ports 22,80,443,3000
+    snap-guest -b your-os-base -t web-test --bind-all
 
-    usage: ./snap-guest options
+The tool prints every forwarded port when the guest is ready, including clickable
+HTTP and HTTPS URLs. The same summary is written to the guest MOTD:
 
-    Tool for ultra-fast copy-on-write image provisioning. Prepare a base image and
-    then spawn a COW instance. Then again, and again.
+    This VM was built with snap-guest.
+    SSH: ssh testuser@foreman.example.com
+    Forwarded ports on 127.0.0.1:
+      127.0.0.1:PORT -> guest:22
+      http://127.0.0.1:PORT/
+      https://127.0.0.1:PORT/
 
-    OPTIONS:
-      --help | -h
-            Show this message
-      --list | -l
-            List avaiable images (with "base" in the name)
-      --list-all
-            List all images
-      --base [image] | -b [image]
-            Base image name (template) - required
-      --target [name] | -t [name]
-            Target image name (and hostname) - required
-      --network [opts] | -n [opts]
-            Network options for virt-install (default: "network=default")
-      --network2 [opts]
-            Second network NIC settings (none by default)
-      --memory [MB] | -m [MB]
-            Memory (default: 800 MiB)
-      --cpus [CPUs] | -c [CPUs]
-            Number of CPUs (default: 1)
-      --image-dir [path] | -p [path]
-            Target images path (default: /var/lib/libvirt/images/)
-      --base-image-dir [path]
-            Base images path (default: /var/lib/libvirt/images/)
-      --domain [domain] | -d [domain]
-            Domain suffix like "mycompany.com" (default: none)
-      --domain-prefix [prefix]
-            Domain prefix like "test-" -> "test-NAME.lan" (default: none)
-      --force | -f
-            Force creating new guest (no questions, destroys one the same name)
-      --graphics [opts] | -g [opts]
-            Graphics options passed to virt-install via --graphics
-            (default is vnc,listen=0.0.0.0)
-      --swap [MBs] | -s [MBs]
-            Creates RAW disk and connects and mounts it of given size (in MB)
-            Note the virtual disc has no parititions.
-      --firstboot [command] | -1 [command]
-            Command to execute during first boot in /root dir
-            (logfile available in /root/firstboot.log)
-      --static-ipaddr [address]
-            Configure a static IP address (only Fedora/RHEL).
-      --static-netmask [netmask]
-            Configure a static network mask (only Fedora/RHEL).
-      --static-gateway [gateway]
-            Configure a static network gateway (only Fedora/RHEL).
-      --cpu-feature [opts]
-            Configure the CPU model and CPU features exposed to the guest.
-
-## Do not start base images
-
-There is one **important thing** you need to know. Once you have some guests,
-you **must not start** template (base) image, because that would break the
-"child" guests.
-
-Network
--------
-
-The script modifies network settings in /etc/sysconfig directory (hostname and
-MAC address of the eth0). The MAC address is generated from the KVM host name
-and target name, so recreating a target on the same KVM host gives it the same
-MAC address.
-
-This is great for testing: when you provision a box called "test", delete it,
-and provision it again, DHCP assigns it the same MAC address and therefore
-usually the same IP address.
-
-It is also possible to provision guests with static network settings. It is
-currently available for Fedora and Red Hats. Example options:
-
-    snap-guest ... \
-        --static-ipaddr 192.168.100.2 \
-        --static-netmask 255.255.255.0 \
-        --static-gateway 192.168.100.1
-
-## DNS with libvirt
-
-Set a domain on the libvirt network so that libvirt configures dnsmasq for
-guest name resolution. The `--domain` option gives a guest its fully-qualified
-hostname; it does not configure the libvirt network domain.
-
-    virsh net-edit default
-
-Ensure the network XML contains the desired domain, then restart the network:
-
-    <network>
-      <domain name='example.com'/>
-    </network>
-
-    virsh net-stop default
-    virsh net-start default
-
-Guests on that network can then resolve each other as `name.example.com`.
+Each host port is derived from the KVM host, target name, and guest port, so
+recreating the same target uses the same MAC address and forwarding ports. Run
+`snap-guest --help` for all options. Use `--force` to stop and undefine an
+existing user-session domain of the target name and remove its target overlay
+before creating a fresh test VM.
 
 ## Credits and license
 
-The script is distributed as public domain.
+This project is distributed as public domain.
 
-Original script was written by Red Hat folks (Jason Dobies, Shannon Hughes,
-Mike McCune and others).
+The original script was written by Red Hat folks, including Jason Dobies,
+Shannon Hughes, Mike McCune, and others. See [AUTHORS](AUTHORS) for the full
+list of contributors.
 
-Special thanks to all who improve this set of scripts. See AUTHORS for full
-list.
+In 2026, snap-guest was completely revamped: cloud-init support was removed,
+guest images are no longer mounted or modified, and the tool runs entirely
+through unprivileged `qemu:///session` libvirt. Provisioning is done by SSH.
+Host root privileges are no longer required.

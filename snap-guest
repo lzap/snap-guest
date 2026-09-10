@@ -1,241 +1,391 @@
 #!/bin/bash
 
+set -o pipefail
+
 usage() {
 cat <<USAGE
 usage: $0 options
 
-Tool for ultra-fast copy-on-write image provisioning. Prepare a base image and
-then spawn a COW instance. Then again, and again.
+Create a qcow2 overlay in the per-user libvirt session, start a guest with
+rootless user-mode networking, set its hostname over SSH, and wait until it
+has rebooted successfully.
+
+The base image must have SSH enabled and authorize the selected user's public
+key. A non-root SSH user must have passwordless sudo for hostnamectl and
+systemctl.
 
 OPTIONS:
   --help | -h
         Show this message
   --list | -l
-        List avaiable images (with "base" in the name)
+        List available base images (with "base" in the name)
   --list-all
-        List all images
+        List all available base images
   --base [image] | -b [image]
-        Base image name (template) - required
-  --target [name] | -t [name]
-        Target image name (and hostname) - required
-  --network [opts] | -n [opts]
-        Network options for virt-install (default: "network=default")
-  --network2 [opts]
-        Second network NIC settings (none by default)
+        Base image name, without the .qcow2 extension (required)
+  --target [hostname] | -t [hostname]
+        Guest name and hostname, optionally fully qualified (required)
   --memory [MB] | -m [MB]
         Memory (default: 800 MiB)
   --cpus [CPUs] | -c [CPUs]
         Number of CPUs (default: 1)
   --image-dir [path] | -p [path]
-        Target images path (default: /var/lib/libvirt/images/)
+        Target image path (default: ~/.local/share/libvirt/images/)
   --base-image-dir [path]
-        Base images path (default: /var/lib/libvirt/images/)
-  --domain [domain] | -d [domain]
-        Domain suffix like "mycompany.com" (default: none)
-  --domain-prefix [prefix]
-        Domain prefix like "test-" -> "test-NAME.lan" (default: none)
-  --force | -f
-        Force creating new guest (destroy existing, no questions, DANGEROUS!)
+        Base image path (default: ~/.local/share/libvirt/images/)
+  --ssh-user [user]
+        SSH user; defaults to the current local user
+  --ports [ports]
+        Comma-separated TCP ports to forward (default: 22,80,443,3000)
+  --bind-all
+        Expose forwarded ports on all host addresses (default: localhost only)
   --graphics [opts] | -g [opts]
-        Graphics options passed to virt-install via --graphics
-        (default is vnc,listen=0.0.0.0)
-  --swap [MBs] | -s [MBs]
-        Creates RAW disk and connects and mounts it as swap of given size.
-        The created virtual disc is NOT parititioned (it is used raw).
-  --firstboot [command] | -1 [command]
-        Command to execute during first boot in /root dir
-        (logfile available in /root/firstboot.log)
-  --static-ipaddr [address]
-        It is possible to configure static network setup (only Fedora/RHEL).
-  --static-netmask [netmask]
-        It is possible to configure static network setup (only Fedora/RHEL).
-  --static-gateway [gateway]
-        It is possible to configure static network setup (only Fedora/RHEL).
+        Graphics options passed to virt-install
+        (default: vnc,listen=127.0.0.1)
   --cpu-feature [opts]
-        Configure the CPU model and CPU features exposed to the guest.
+        CPU model and features passed to virt-install via --cpu
+  --force | -f
+        Replace an existing user-session guest and target overlay image
 
-EXAMPLE:
+EXAMPLES:
 
   $0 --list
-  $0 -p /mnt/data/images --list-all
-  $0 -b fedora-17-base -t test-vm -s 4098
-  $0 -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
-  $0 -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
+  $0 -b rhel-10-base -t test-01 --base-image-dir /scratch/images
+  $0 -b rhel-10-base -t test-02 --ssh-user root --base-image-dir /scratch/images
 USAGE
 }
 
-# determine script directory
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPTDIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+die() {
+  echo "$*" >&2
+  exit 1
+}
+
+require_binary() {
+  command -v "$1" >/dev/null || die "Please install '$1' first to use snap-guest."
+}
+
+wait_for_ssh() {
+  local attempts=$1
+  local attempt=0
+
+  while (( attempt < attempts )); do
+    if ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@127.0.0.1" true 2>/dev/null; then
+      return 0
+    fi
+    ((attempt += 1))
+    sleep 1
+  done
+
+  return 1
+}
+
+wait_for_ssh_shutdown() {
+  local attempts=$1
+  local attempt=0
+
+  while (( attempt < attempts )); do
+    if ! ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@127.0.0.1" true 2>/dev/null; then
+      return 0
+    fi
+    ((attempt += 1))
+    sleep 1
+  done
+
+  return 1
+}
+
+host_port_for() {
+  local guest_port=$1
+  local port_hash
+
+  read -r port_hash _ < <(printf '%s' "$HOST_NAME$TARGET_NAME:$guest_port" | openssl dgst -md5 -r)
+  printf '%d\n' "$((20000 + 16#${port_hash:0:6} % 30000))"
+}
+
+print_forwarded_ports() {
+  local index
+  local guest_port
+  local host_port
+
+  echo "This VM was built with snap-guest."
+  echo "SSH: ssh $SSH_USER@$TARGET_NAME"
+  echo "Forwarded ports on $FORWARD_HOST:"
+  for index in "${!PORTS[@]}"; do
+    guest_port=${PORTS[index]}
+    host_port=${HOST_PORTS[index]}
+    case $guest_port in
+      80) printf '  http://%s:%s/\n' "$FORWARD_HOST" "$host_port" ;;
+      443) printf '  https://%s:%s/\n' "$FORWARD_HOST" "$host_port" ;;
+      *) printf '  %s:%s -> guest:%s\n' "$FORWARD_HOST" "$host_port" "$guest_port" ;;
+    esac
+  done
+}
+
+update_ssh_config() {
+  local ssh_dir="$HOME/.ssh"
+  local snap_config="$ssh_dir/config-snap-guest"
+  local temp_config
+
+  mkdir -p "$ssh_dir" || die "Unable to create '$ssh_dir'."
+  chmod 700 "$ssh_dir" || die "Unable to set permissions on '$ssh_dir'."
+  touch "$snap_config" || die "Unable to create '$snap_config'."
+  chmod 600 "$snap_config" || die "Unable to set permissions on '$snap_config'."
+
+  temp_config=$(mktemp "$ssh_dir/config-snap-guest.XXXXXX") || die "Unable to update '$snap_config'."
+  awk -v target="$TARGET_NAME" '
+    $0 == "# BEGIN snap-guest " target { skip = 1; next }
+    $0 == "# END snap-guest " target { skip = 0; next }
+    !skip { print }
+  ' "$snap_config" > "$temp_config" || {
+    rm -f "$temp_config"
+    die "Unable to read '$snap_config'."
+  }
+  {
+    printf '\n# BEGIN snap-guest %s\n' "$TARGET_NAME"
+    printf 'Host %s\n' "$TARGET_NAME"
+    printf '  HostName 127.0.0.1\n'
+    printf '  Port %s\n' "$SSH_PORT"
+    printf '  User %s\n' "$SSH_USER"
+    printf '  StrictHostKeyChecking no\n'
+    printf '  UserKnownHostsFile /dev/null\n'
+    printf '# END snap-guest %s\n' "$TARGET_NAME"
+  } >> "$temp_config"
+  if ! chmod 600 "$temp_config" || ! mv "$temp_config" "$snap_config"; then
+    rm -f "$temp_config"
+    die "Unable to update '$snap_config'."
+  fi
+}
 
 SOURCE_NAME=""
 TARGET_NAME=""
-NETWORK="network=default"
-NETWORK2=()
 MEM="800"
-SWAP=0
 CPUS="1"
-IMAGE_DIR="/var/lib/libvirt/images"
-BASE_IMAGE_DIR="/var/lib/libvirt/images"
-DOMAIN=""
-PREFIX=""
+IMAGE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/libvirt/images"
+BASE_IMAGE_DIR="$IMAGE_DIR"
+SSH_USER=""
+PORTS_TEXT="22,80,443,3000"
+BIND_ALL=0
 FORCE=0
 LIST=0
 LIST_ALL=0
-GRAPHICS_OPTS="vnc,listen=0.0.0.0"
-COMMAND=""
-STATIC_IPADDR=""
-STATIC_NETMASK=""
-STATIC_GATEWAY=""
+GRAPHICS_OPTS="vnc,listen=127.0.0.1"
 CPU_FEATURE=()
+LIBVIRT_URI="qemu:///session"
+HOST_NAME=$(hostname)
+FORWARD_HOST="127.0.0.1"
+SSH_PORT=""
+PORTS=()
+HOST_PORTS=()
+PORT_MAPPINGS=()
+SSH_OPTIONS=(
+  -o BatchMode=yes
+  -o ConnectTimeout=5
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o LogLevel=ERROR
+)
 
-if ! options=$(getopt -o hlfb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,static-ipaddr:,static-netmask:,static-gateway:,cpu-feature:,help -- "$@"); then
+if ! options=$(getopt -o hlfb:t:m:c:p:g: -l list,list-all,force,bind-all,image-dir:,base-image-dir:,base:,graphics:,target:,memory:,cpus:,ssh-user:,ports:,cpu-feature:,help -- "$@"); then
   exit 1
 fi
 
 eval set -- "$options"
 
-while [ $# -gt 0 ]; do
-    case $1 in
+while [[ $# -gt 0 ]]; do
+  case $1 in
     --list|-l) LIST=1 ;;
     --list-all) LIST_ALL=1 ;;
     --force|-f) FORCE=1 ;;
-    --image-dir|-p) IMAGE_DIR="$2" ; shift ;;
-    --base-image-dir) BASE_IMAGE_DIR="$2" ; shift ;;
-    --base|-b) SOURCE_NAME="$2" ; shift ;;
-    --graphics|-g) GRAPHICS_OPTS="$2" ; shift ;;
-    --target|-t) TARGET_NAME="$2" ; shift ;;
-    --network|-n) NETWORK="$2" ; shift ;;
-    --network2) NETWORK2=("--network=$2") ; shift ;;
-    --memory|-m) MEM="$2" ; shift ;;
-    --cpus|-c) CPUS="$2" ; shift ;;
-    --domain|-d) DOMAIN=".$2" ; shift ;;
-    --domain-prefix) PREFIX="$2" ; shift ;;
-    --swap|-s) SWAP="$2" ; shift ;;
-    --firstboot|-1) COMMAND="$2" ; shift ;;
-    --static-ipaddr) STATIC_IPADDR="$2" ; shift ;;
-    --static-netmask) STATIC_NETMASK="$2" ; shift ;;
-    --static-gateway) STATIC_GATEWAY="$2" ; shift ;;
-    --cpu-feature) CPU_FEATURE=("--cpu=$2") ; shift ;;
-    --help|-h) usage;  exit ;;
-    (--) shift; break;;
-    (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
-    (*) break;;
-    esac
-    shift
+    --image-dir|-p) IMAGE_DIR=$2; shift ;;
+    --base-image-dir) BASE_IMAGE_DIR=$2; shift ;;
+    --base|-b) SOURCE_NAME=$2; shift ;;
+    --graphics|-g) GRAPHICS_OPTS=$2; shift ;;
+    --target|-t) TARGET_NAME=$2; shift ;;
+    --memory|-m) MEM=$2; shift ;;
+    --cpus|-c) CPUS=$2; shift ;;
+    --ssh-user) SSH_USER=$2; shift ;;
+    --ports) PORTS_TEXT=$2; shift ;;
+    --bind-all) BIND_ALL=1 ;;
+    --cpu-feature) CPU_FEATURE=("--cpu=$2"); shift ;;
+    --help|-h) usage; exit 0 ;;
+    --) shift; break ;;
+    *) die "$0: error - unrecognized option $1" ;;
+  esac
+  shift
 done
 
 if [[ $LIST -eq 1 || $LIST_ALL -eq 1 ]]; then
   shopt -s nullglob
-  for IMAGE in "$BASE_IMAGE_DIR"/*.img "$BASE_IMAGE_DIR"/*.qcow2; do
-    IMAGE_NAME=${IMAGE##*/}
-    if [[ $LIST_ALL -eq 1 || $IMAGE_NAME == *base* ]]; then
-      IMAGE_NAME=${IMAGE_NAME%.img}
-      printf '%s\n' "${IMAGE_NAME%.qcow2}"
+  for image in "$BASE_IMAGE_DIR"/*.qcow2; do
+    image_name=${image##*/}
+    if [[ $LIST_ALL -eq 1 || $image_name == *base* ]]; then
+      printf '%s\n' "${image_name%.qcow2}"
     fi
   done
   exit 0
 fi
 
-if [[ -z "$SOURCE_NAME" || -z "$TARGET_NAME" ]]; then
-  usage; exit 1
+[[ -n $SOURCE_NAME && -n $TARGET_NAME ]] || { usage; exit 1; }
+[[ $TARGET_NAME =~ ^[[:alnum:]][[:alnum:].-]*$ ]] || die "Target must be a valid hostname containing only letters, numbers, dots, and hyphens."
+if [[ -z $SSH_USER ]]; then
+  SSH_USER=$(id -un 2>/dev/null) || die "Unable to determine the current user. Specify one with --ssh-user."
+fi
+[[ $SSH_USER =~ ^[a-z_][a-z0-9_-]*$ ]] || die "SSH user must be a valid local user name."
+[[ $MEM =~ ^[1-9][0-9]*$ ]] || die "Memory must be a positive integer in MiB."
+[[ $CPUS =~ ^[1-9][0-9]*$ ]] || die "CPUs must be a positive integer."
+IFS=',' read -r -a PORTS <<<"$PORTS_TEXT"
+[[ ${#PORTS[@]} -gt 0 ]] || die "At least port 22 must be forwarded."
+for guest_port in "${PORTS[@]}"; do
+  [[ $guest_port =~ ^[1-9][0-9]*$ && $guest_port -le 65535 ]] || die "Forwarded ports must be integers from 1 to 65535."
+done
+if ! printf '%s\n' "${PORTS[@]}" | grep -Fxq 22; then
+  die "Forwarded ports must include 22 for SSH provisioning."
+fi
+for binary in awk getopt grep mktemp openssl passt qemu-img ssh ss virsh virt-install; do
+  require_binary "$binary"
+done
+
+SOURCE_IMG="$BASE_IMAGE_DIR/$SOURCE_NAME.qcow2"
+TARGET_IMG="$IMAGE_DIR/$TARGET_NAME.qcow2"
+[[ -f $SOURCE_IMG ]] || die "Base image '$SOURCE_IMG' not found."
+if [[ -e $TARGET_IMG && $SOURCE_IMG -ef $TARGET_IMG ]]; then
+  die "Base image and target overlay must be different files. Choose a different target name."
 fi
 
-# Check prerequisites
-for BINARY in getopt virsh qemu-img mkswap openssl hexdump perl sort virt-install; do
-  if ! type -p "$BINARY" >/dev/null ; then
-    echo "Please install '$BINARY' first to use snap-guest!" 1>&2
-    echo "See https://github.com/lzap/snap-guest#installation" 1>&2
-    exit 1
+DOMAIN_NAMES=$(virsh --connect "$LIBVIRT_URI" list --all --name) || die "Unable to list user-session libvirt domains."
+TARGET_DOMAIN_EXISTS=0
+if grep -Fxq -- "$TARGET_NAME" <<<"$DOMAIN_NAMES"; then
+  TARGET_DOMAIN_EXISTS=1
+fi
+
+read -r MAC_HASH _ < <(printf '%s' "$HOST_NAME$TARGET_NAME" | openssl dgst -md5 -r)
+MAC="52:54:00:${MAC_HASH:0:2}:${MAC_HASH:2:2}:${MAC_HASH:4:2}"
+NETWORK_OPTIONS="user,backend.type=passt,mac=$MAC"
+if [[ $BIND_ALL -eq 1 ]]; then
+  FORWARD_HOST=$TARGET_NAME
+fi
+TARGET_DOMAIN_XML=""
+if [[ $TARGET_DOMAIN_EXISTS -eq 1 ]]; then
+  TARGET_DOMAIN_XML=$(virsh --connect "$LIBVIRT_URI" dumpxml "$TARGET_NAME" 2>/dev/null || true)
+fi
+declare -A USED_HOST_PORTS=()
+for index in "${!PORTS[@]}"; do
+  guest_port=${PORTS[index]}
+  host_port=$(host_port_for "$guest_port")
+  [[ -z ${USED_HOST_PORTS[$host_port]+x} ]] || die "Forwarded ports result in a duplicate host port. Choose a different target name or port list."
+  USED_HOST_PORTS[$host_port]=1
+  if ss -ltnH "sport = :$host_port" | grep -q .; then
+    grep -Fq -- "<range start='$host_port'" <<<"$TARGET_DOMAIN_XML" || \
+      die "Local forwarding port $host_port is already in use. Choose a different target name."
+  fi
+  HOST_PORTS[index]=$host_port
+  PORT_MAPPINGS[index]="$guest_port:$host_port"
+  NETWORK_OPTIONS+=",portForward${index}.proto=tcp"
+  if [[ $BIND_ALL -eq 0 ]]; then
+    NETWORK_OPTIONS+=",portForward${index}.address=127.0.0.1"
+  fi
+  NETWORK_OPTIONS+=",portForward${index}.range0.start=$host_port,portForward${index}.range0.to=$guest_port"
+  if [[ $guest_port == 22 ]]; then
+    SSH_PORT=$host_port
   fi
 done
 
-shopt -s nullglob
-SOURCE_IMAGES=("$BASE_IMAGE_DIR"/"$SOURCE_NAME"*.img \
-  "$BASE_IMAGE_DIR"/"$SOURCE_NAME"*.qcow2)
-if [[ ${#SOURCE_IMAGES[@]} -gt 0 ]]; then
-  mapfile -t SOURCE_IMAGES < <(printf '%s\n' "${SOURCE_IMAGES[@]}" | sort -V)
-  SOURCE_IMG=${SOURCE_IMAGES[${#SOURCE_IMAGES[@]} - 1]}
-else
-  SOURCE_IMG=""
-fi
-TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
-TARGET_IMG_SWAP=$IMAGE_DIR/$TARGET_NAME-swap.img
-MAC="52:54:00$(printf '%s' "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
-TARGET_HOSTNAME="$PREFIX$TARGET_NAME$DOMAIN"
+mkdir -p "$IMAGE_DIR" || die "Unable to create image directory '$IMAGE_DIR'."
 
-if [ ! -f "$SOURCE_IMG" ]; then
-  echo "Base image $SOURCE_IMG not found!"
-  exit 1
-fi
-
-if [ -f "$TARGET_IMG" ]; then
-  echo "Target image already exists!"
-  if [[ $FORCE -eq 1 ]]; then
-    REPLY="y"
-  else
-    read -r -p "Shutdown and remove host with this name first (y/[n])? " REPLY
+if [[ $TARGET_DOMAIN_EXISTS -eq 1 || -e $TARGET_IMG ]]; then
+  if [[ $FORCE -eq 0 ]]; then
+    read -r -p "Replace existing guest '$TARGET_NAME' and its overlay (y/[n])? " reply
+    [[ $reply == y ]] || exit 1
   fi
-  if [[ $REPLY != "y" ]]; then
-    exit 1
+  if [[ $TARGET_DOMAIN_EXISTS -eq 1 ]]; then
+    DOMAIN_STATE=$(virsh --connect "$LIBVIRT_URI" domstate "$TARGET_NAME") || die "Unable to determine the state of '$TARGET_NAME'."
+    if [[ $DOMAIN_STATE != "shut off" ]]; then
+      virsh --connect "$LIBVIRT_URI" destroy "$TARGET_NAME" || die "Unable to stop existing guest '$TARGET_NAME'."
+    fi
+    virsh --connect "$LIBVIRT_URI" undefine "$TARGET_NAME" --nvram 2>/dev/null || \
+      virsh --connect "$LIBVIRT_URI" undefine "$TARGET_NAME" || \
+      die "Unable to undefine existing guest '$TARGET_NAME'."
   fi
-  # Need to do it twice (sometimes this fails).
-  virsh destroy "$TARGET_NAME" 2>/dev/null || true
-  sleep 2s
-  virsh destroy "$TARGET_NAME" 2>/dev/null || true
-  sleep 1s
-  virsh undefine "$TARGET_NAME"
-  rm -f -- "$TARGET_IMG" "$TARGET_IMG_SWAP"
+  if [[ -e $TARGET_IMG ]]; then
+    rm -f -- "$TARGET_IMG" || die "Unable to remove existing overlay '$TARGET_IMG'."
+  fi
 fi
 
 echo "Creating snapshot guest $TARGET_NAME"
+qemu-img create -f qcow2 -F qcow2 -b "$SOURCE_IMG" "$TARGET_IMG" || die "Unable to create overlay image."
 
-# -- Image Creation --------------
-
-echo "Creating snapshot image"
-qemu-img create -f qcow2 -b "$SOURCE_IMG" "$TARGET_IMG"
-
-# -- Image Manipulation ----------
-
-export COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME \
-  STATIC_IPADDR STATIC_NETMASK STATIC_GATEWAY
-perl -w "$SCRIPTDIR/prepare-image.pl"
-
-# -- Swap Creation --------------
-
-if [[ $SWAP -gt 0 ]]; then
-  qemu-img create -f raw "$TARGET_IMG_SWAP" "${SWAP}M"
-  mkswap -f "$TARGET_IMG_SWAP"
-  DISK_SWAP=(--disk "$TARGET_IMG_SWAP,device=disk,bus=virtio,format=raw")
-else
-  DISK_SWAP=()
-fi
-
-# -- Image Provisioning ---------
-
-echo "Provisioning guest $TARGET_NAME"
-echo "Hostname: $TARGET_HOSTNAME"
-echo "CPUs:     $CPUS"
-echo "Memory:   $MEM MB"
-echo "Swap:     $SWAP MB"
-echo "MAC:      $MAC"
 VIRT_INSTALL_ARGS=(
   --vcpus "$CPUS"
   --ram "$MEM"
   --import
+  --osinfo "detect=on,require=off"
   --name "$TARGET_NAME"
   --disk "$TARGET_IMG,device=disk,bus=virtio,format=qcow2"
   --graphics "$GRAPHICS_OPTS"
   --noautoconsole
   --force
-  "--network=$NETWORK,mac=$MAC"
+  "--network=$NETWORK_OPTIONS"
 )
-VIRT_INSTALL_ARGS+=("${DISK_SWAP[@]}" "${NETWORK2[@]}" "${CPU_FEATURE[@]}")
-virt-install "${VIRT_INSTALL_ARGS[@]}"
+VIRT_INSTALL_ARGS+=("${CPU_FEATURE[@]}")
 
-# -- EOF --
+echo "Provisioning guest $TARGET_NAME"
+echo "MAC: $MAC"
+print_forwarded_ports
+virt-install --connect "$LIBVIRT_URI" "${VIRT_INSTALL_ARGS[@]}" || die "Unable to start guest '$TARGET_NAME'."
+
+echo "Waiting for SSH as $SSH_USER"
+if ! wait_for_ssh 180; then
+  die "Unable to connect to '$TARGET_NAME' over SSH. The base image must authorize the public key for '$SSH_USER', run sshd, and listen on port 22. Use --ssh-user for a different account."
+fi
+
+if ! ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@127.0.0.1" sh -s -- "$TARGET_NAME" "$FORWARD_HOST" "$SSH_USER" "${PORT_MAPPINGS[@]}" <<'REMOTE'; then
+set -e
+
+target_name=$1
+host_name=$2
+ssh_user=$3
+shift 3
+
+write_motd() {
+  echo "This VM was built with snap-guest."
+  echo "SSH: ssh $ssh_user@$target_name"
+  echo "Forwarded ports on $host_name:"
+  for mapping in "$@"; do
+    guest_port=${mapping%%:*}
+    host_port=${mapping##*:}
+    case $guest_port in
+      80) echo "  http://$host_name:$host_port/" ;;
+      443) echo "  https://$host_name:$host_port/" ;;
+      *) echo "  $host_name:$host_port -> guest:$guest_port" ;;
+    esac
+  done
+}
+
+if [ "$(id -u)" -eq 0 ]; then
+  hostnamectl set-hostname "$target_name"
+  write_motd "$@" > /etc/motd
+else
+  sudo -n hostnamectl set-hostname "$target_name"
+  write_motd "$@" | sudo -n tee /etc/motd >/dev/null
+fi
+REMOTE
+  die "Unable to set the hostname. '$SSH_USER' must be root or have passwordless sudo in the base image."
+fi
+
+echo "Rebooting $TARGET_NAME to apply its new hostname"
+ssh "${SSH_OPTIONS[@]}" -p "$SSH_PORT" "$SSH_USER@127.0.0.1" \
+  "if [ \"\$(id -u)\" -eq 0 ]; then nohup sh -c 'sleep 1; systemctl reboot' >/dev/null 2>&1 & else sudo -n nohup sh -c 'sleep 1; systemctl reboot' >/dev/null 2>&1 & fi" || \
+  die "Unable to reboot '$TARGET_NAME'. '$SSH_USER' must be root or have passwordless sudo in the base image."
+
+if ! wait_for_ssh_shutdown 30; then
+  die "Guest '$TARGET_NAME' did not begin rebooting."
+fi
+
+echo "Waiting for $TARGET_NAME to reboot"
+if ! wait_for_ssh 180; then
+  die "Guest '$TARGET_NAME' did not return over SSH after reboot."
+fi
+
+echo "Guest ready: $TARGET_NAME"
+update_ssh_config
+print_forwarded_ports
