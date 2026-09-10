@@ -47,13 +47,13 @@ OPTIONS:
   --firstboot [command] | -1 [command]
         Command to execute during first boot in /root dir
         (logfile available in /root/firstboot.log)
-  --static-ipaddr
+  --static-ipaddr [address]
         It is possible to configure static network setup (only Fedora/RHEL).
-  --static-netmask
+  --static-netmask [netmask]
         It is possible to configure static network setup (only Fedora/RHEL).
-  --static-gateway
+  --static-gateway [gateway]
         It is possible to configure static network setup (only Fedora/RHEL).
-  --cpu-feature
+  --cpu-feature [opts]
         Configure the CPU model and CPU features exposed to the guest.
 
 EXAMPLE:
@@ -136,10 +136,11 @@ done
 
 if [[ $LIST -eq 1 || $LIST_ALL -eq 1 ]]; then
   shopt -s nullglob
-  for IMAGE in "$BASE_IMAGE_DIR"/*.img; do
+  for IMAGE in "$BASE_IMAGE_DIR"/*.img "$BASE_IMAGE_DIR"/*.qcow2; do
     IMAGE_NAME=${IMAGE##*/}
     if [[ $LIST_ALL -eq 1 || $IMAGE_NAME == *base* ]]; then
-      printf '%s\n' "${IMAGE_NAME%.img}"
+      IMAGE_NAME=${IMAGE_NAME%.img}
+      printf '%s\n' "${IMAGE_NAME%.qcow2}"
     fi
   done
   exit 0
@@ -159,7 +160,8 @@ for BINARY in getopt virsh qemu-img mkswap sed tail openssl hexdump perl virt-in
 done
 
 shopt -s nullglob
-SOURCE_IMAGES=("$BASE_IMAGE_DIR"/"$SOURCE_NAME"*.img)
+SOURCE_IMAGES=("$BASE_IMAGE_DIR"/"$SOURCE_NAME"*.img \
+  "$BASE_IMAGE_DIR"/"$SOURCE_NAME"*.qcow2)
 if [[ ${#SOURCE_IMAGES[@]} -gt 0 ]]; then
   mapfile -t SOURCE_IMAGES < <(printf '%s\n' "${SOURCE_IMAGES[@]}" | sort -V)
   SOURCE_IMG=${SOURCE_IMAGES[${#SOURCE_IMAGES[@]} - 1]}

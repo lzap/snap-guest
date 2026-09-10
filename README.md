@@ -4,8 +4,9 @@ Snap-guest is a simple script for creating copy-on-write QEMU/KVM guests.
 
 ## Features
 
-Before you start, you need to have a base qcow2 image customized to your needs
-(updated, passwords set, SSH keys, sofware installed). The README will describe
+Before you start, you need to have a base image named with either an `.img` or
+`.qcow2` extension and customized to your needs (updated, passwords set, SSH
+keys, sofware installed). The README will describe
 how to easily do this with `virt-install`.
 
  * CLI
@@ -35,9 +36,10 @@ And then:
 Before you can do anything, a base image must exist. It's recommended to use
 "base" string in the guest name (e.g. fedora-10-base or rhel4-base) to
 differentiate those files (snap-guest lists them using -l option), but it is
-not mandatory (option -a lists them all). The base image does not have to be
-qcow2! You can use RAW image as well, however, testing showed that there is no
-measurable benefit from using RAW images, especially when using `unsafe`.
+not mandatory (`--list-all` lists them all). The base image does not have to be
+qcow2: a raw image named with an `.img` extension also works. However, testing
+showed that there is no measurable benefit from using raw images, especially
+when using `unsafe`.
 
 The only requirement is the *hostname* - it must be same as the base guest name.
 So if you name the VM fedora-10-base, hostname must be set the same without any
@@ -132,6 +134,14 @@ Here you can find all parameters:
       --firstboot [command] | -1 [command]
             Command to execute during first boot in /root dir
             (logfile available in /root/firstboot.log)
+      --static-ipaddr [address]
+            Configure a static IP address (only Fedora/RHEL).
+      --static-netmask [netmask]
+            Configure a static network mask (only Fedora/RHEL).
+      --static-gateway [gateway]
+            Configure a static network gateway (only Fedora/RHEL).
+      --cpu-feature [opts]
+            Configure the CPU model and CPU features exposed to the guest.
 
 ## Do not start base images
 
