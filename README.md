@@ -23,7 +23,7 @@ Traditional image manipulation features:
 Dependencies for Red Hat systems:
 
  * dnf -y install bash sed python-virtinst qemu-img libguestfs-mount \
-    perl perl-Sys-Guestfs kvm openssl util-linux genisoimage
+    perl perl-Sys-Guestfs kvm openssl util-linux
 
 And then:
 
@@ -89,8 +89,8 @@ Here you can find all parameters:
 
     usage: ./snap-guest options
 
-    Tool for ultra-fast copy-on-write image provisioning. Prepare a base image (or
-    download a cloud image) and then spawn an COW instance. Then again, and again.
+    Tool for ultra-fast copy-on-write image provisioning. Prepare a base image and
+    then spawn a COW instance. Then again, and again.
 
     OPTIONS:
       --help | -h
@@ -129,20 +129,9 @@ Here you can find all parameters:
       --swap [MBs] | -s [MBs]
             Creates RAW disk and connects and mounts it of given size (in MB)
             Note the virtual disc has no parititions.
-            For cloud-image provisioning swap is not turned on automatically and
-            you need to do this manually in user-data script (swapon /dev/vdb).
       --firstboot [command] | -1 [command]
             Command to execute during first boot in /root dir
             (logfile available in /root/firstboot.log)
-      --cloud-image
-            Disables image manipulation and enables cloud-init seed via CD-ROM
-      --user-data-file [file]
-            Reads cloud-init user-data from file
-      --user-data-ssh
-            Generate primitive user-data file with only your public ssh key
-      --user-data-stdin
-            Reads cloud-init user-data from standard input
-            (overrides all --user-data-* options)
 
 ## Do not start base images
 

@@ -4,8 +4,8 @@ usage() {
 cat <<USAGE
 usage: $0 options
 
-Tool for ultra-fast copy-on-write image provisioning. Prepare a base image (or
-download a cloud image) and then spawn an COW instance. Then again, and again.
+Tool for ultra-fast copy-on-write image provisioning. Prepare a base image and
+then spawn a COW instance. Then again, and again.
 
 OPTIONS:
   --help | -h
@@ -44,27 +44,9 @@ OPTIONS:
   --swap [MBs] | -s [MBs]
         Creates RAW disk and connects and mounts it as swap of given size.
         The created virtual disc is NOT parititioned (it is used raw).
-        For cloud-image provisioning swap is created but ignored and
-        you need to do this manually in user-data script (swapon /dev/vdb).
   --firstboot [command] | -1 [command]
         Command to execute during first boot in /root dir
         (logfile available in /root/firstboot.log)
-  --cloud-image
-        Disables image manipulation and enables cloud-init seed via CD-ROM
-  --cloud-preconf
-        Run image manipulation (MAC address, hostname setting, fstab) even
-        when operating in the cloud mode
-  --user-data-file [file]
-        Reads cloud-init user-data from file
-  --user-data-ssh
-        Generate primitive user-data file with only your public ssh key
-  --user-data-stdin
-        Reads cloud-init user-data from standard input
-        (overrides all --user-data-* options)
-  --boot-script [filename] | -i [filename]
-        Appends a bash bootstrip to the user-data. Can be used multiple times.
-  --boot-script-prefix [directory]
-        Prepend directory to each boot script (so -i options can be shorter).
   --static-ipaddr
         It is possible to configure static network setup (only Fedora/RHEL).
   --static-netmask
@@ -81,8 +63,6 @@ EXAMPLE:
   $0 -b fedora-17-base -t test-vm -s 4098
   $0 -b fedora-17-base -t test-vm2 -n bridge=br0 -d example.com
   $0 -b rhel-6-base -t test-vm -m 2048 -c 4 -p /mnt/data/images
-  echo "my user data" | $0 -b f19 -t aa --cloud-image --user-data-stdin \\
-    -n bridge=br0 -d xxx.redhat.com --domain-prefix 'lzap-' -s 2048 -f
 USAGE
 }
 
@@ -112,19 +92,12 @@ LIST_ALL=0
 ADD_IP=0
 GRAPHICS_OPTS="vnc,listen=0.0.0.0"
 COMMAND=""
-CLOUD=0
-CLOUD_PRECONF=0
-USER_DATA_STDIN=0
-USER_DATA_FILE=""
-USER_DATA_SSH=0
-BOOT_SCRIPTS=()
-BOOT_SCRIPT_PREFIX=""
 STATIC_IPADDR=""
 STATIC_NETMASK=""
 STATIC_GATEWAY=""
 CPU_FEATURE=""
 
-if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g:i: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,cloud-image,cloud-preconf,user-data-ssh,user-data-stdin,user-data-file:,boot-script,boot-script-prefix:,static-ipaddr:,static-netmask:,static-gateway:,cpu-feature:,help -- "$@"); then
+if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,static-ipaddr:,static-netmask:,static-gateway:,cpu-feature:,help -- "$@"); then
   exit 1
 fi
 
@@ -149,13 +122,6 @@ while [ $# -gt 0 ]; do
     --domain-prefix) PREFIX="$2" ; shift ;;
     --swap|-s) SWAP="$2" ; shift ;;
     --firstboot|-1) COMMAND="$2" ; shift ;;
-    --cloud-image) CLOUD=1 ;;
-    --cloud-preconf) CLOUD_PRECONF=1 ;;
-    --user-data-stdin) USER_DATA_STDIN=1 ;;
-    --user-data-ssh) USER_DATA_SSH=1 ;;
-    --user-data-file) USER_DATA_FILE="$2" ; shift ;;
-    --boot-script|-i) BOOT_SCRIPTS+=("$BOOT_SCRIPT_PREFIX$2:text/x-shellscript") ; shift ;;
-    --boot-script-prefix) BOOT_SCRIPT_PREFIX="$2/" ; shift ;;
     --static-ipaddr) STATIC_IPADDR="$2" ; shift ;;
     --static-netmask) STATIC_NETMASK="$2" ; shift ;;
     --static-gateway) STATIC_GATEWAY="$2" ; shift ;;
@@ -176,7 +142,7 @@ if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
 fi
 
 # Check prerequisites
-for BINARY in getopt virsh qemu-img mkswap sed tail openssl hexdump perl genisoimage virt-install; do
+for BINARY in getopt virsh qemu-img mkswap sed tail openssl hexdump perl virt-install; do
   if ! type -p $BINARY >/dev/null ; then
     echo "Please install '$BINARY' first to use snap-guest!" 1>&2
     echo "See https://github.com/lzap/snap-guest#installation" 1>&2
@@ -218,50 +184,9 @@ qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
 
 # -- Image Manipulation ----------
 
-if [ $CLOUD -eq 0 -o $CLOUD_PRECONF -eq 1 ]; then
-  export COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME \
-    STATIC_IPADDR STATIC_NETMASK STATIC_GATEWAY
-  perl -w "$SCRIPTDIR/prepare-image.pl"
-fi
-
-# -- Cloud Init -----------------
-
-if [ $CLOUD -eq 1 ]; then
-  echo "Generating cloud-init seed"
-  TARGET_IMG_SEED="$IMAGE_DIR/seed-$TARGET_NAME.iso"
-  CITEMP=$(mktemp -d)
-  trap "rm -rf $CITEMP" EXIT
-  # prepare metadata
-  cat > "$CITEMP/meta-data" <<EOS
-instance-id: $TARGET_HOSTNAME
-local-hostname: $TARGET_HOSTNAME
-EOS
-  # prepare userdata
-  [ ! -z "$USER_DATA_FILE" ] && cp "$USER_DATA_FILE" "$CITEMP/user-data"
-  [ $USER_DATA_SSH -eq 1 ] && cat > "$CITEMP/user-data" <<EOS
-#cloud-config
-disable_root: 0
-ssh_authorized_keys:
- - $(cat ~/.ssh/id_rsa.pub)
-EOS
-  [ $USER_DATA_STDIN -eq 1 ] && cat > "$CITEMP/user-data" </dev/stdin
-  if [ ! -f "$CITEMP/user-data" ]; then
-    echo "Please provide at least one --user-data option" 1>&2; exit 1
-  fi
-  # concatenate user-data
-  if [ ${#BOOT_SCRIPTS[@]} -gt 0 ]; then
-    mv "$CITEMP/user-data" "$CITEMP/user-data-main"
-    write-mime-multipart ${BOOT_SCRIPTS[@]} "$CITEMP/user-data-main" > "$CITEMP/user-data"
-  fi
-
-  pushd "$CITEMP" 2>/dev/null
-  genisoimage -output $TARGET_IMG_SEED -volid cidata -joliet -rock user-data meta-data
-  popd 2>/dev/null
-  cat "$CITEMP/user-data"
-  DISK_SEED="--disk $TARGET_IMG_SEED,device=cdrom"
-else
-  DISK_SEED=""
-fi
+export COMMAND TARGET_HOSTNAME MAC SOURCE_NAME SWAP TARGET_IMG TARGET_NAME \
+  STATIC_IPADDR STATIC_NETMASK STATIC_GATEWAY
+perl -w "$SCRIPTDIR/prepare-image.pl"
 
 # -- Swap Creation --------------
 
@@ -284,7 +209,7 @@ echo "MAC:      $MAC"
 virt-install --vcpus $CPUS \
   --ram $MEM --import \
   --name $TARGET_NAME \
-  --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP $DISK_SEED \
+  --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP \
   --graphics "$GRAPHICS_OPTS" \
   --noautoconsole --force \
   --network=$NETWORK,mac=$MAC \
@@ -320,4 +245,3 @@ if [ $ADD_IP -eq 1 ]; then
 fi
 
 # -- EOF --
-
