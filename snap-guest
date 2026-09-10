@@ -78,7 +78,7 @@ SCRIPTDIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 SOURCE_NAME=""
 TARGET_NAME=""
 NETWORK="network=default"
-NETWORK2=""
+NETWORK2=()
 MEM="800"
 SWAP=0
 CPUS="1"
@@ -95,13 +95,13 @@ COMMAND=""
 STATIC_IPADDR=""
 STATIC_NETMASK=""
 STATIC_GATEWAY=""
-CPU_FEATURE=""
+CPU_FEATURE=()
 
 if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,static-ipaddr:,static-netmask:,static-gateway:,cpu-feature:,help -- "$@"); then
   exit 1
 fi
 
-eval set -- $options
+eval set -- "$options"
 
 while [ $# -gt 0 ]; do
     case $1 in
@@ -115,7 +115,7 @@ while [ $# -gt 0 ]; do
     --graphics|-g) GRAPHICS_OPTS="$2" ; shift ;;
     --target|-t) TARGET_NAME="$2" ; shift ;;
     --network|-n) NETWORK="$2" ; shift ;;
-    --network2) NETWORK2="--network=$2" ; shift ;;
+    --network2) NETWORK2=("--network=$2") ; shift ;;
     --memory|-m) MEM="$2" ; shift ;;
     --cpus|-c) CPUS="$2" ; shift ;;
     --domain|-d) DOMAIN=".$2" ; shift ;;
@@ -125,7 +125,7 @@ while [ $# -gt 0 ]; do
     --static-ipaddr) STATIC_IPADDR="$2" ; shift ;;
     --static-netmask) STATIC_NETMASK="$2" ; shift ;;
     --static-gateway) STATIC_GATEWAY="$2" ; shift ;;
-    --cpu-feature) CPU_FEATURE="--cpu=$2" ; shift ;;
+    --cpu-feature) CPU_FEATURE=("--cpu=$2") ; shift ;;
     --help|-h) usage;  exit ;;
     (--) shift; break;;
     (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
@@ -134,26 +134,41 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-[ $LIST -eq 1 ] && ls "$BASE_IMAGE_DIR" | grep '\.img' | grep base | sed 's/\.img//g' && exit 0
-[ $LIST_ALL -eq 1 ] && ls "$BASE_IMAGE_DIR" | grep '\.img' | sed 's/\.img//g' && exit 0
+if [[ $LIST -eq 1 || $LIST_ALL -eq 1 ]]; then
+  shopt -s nullglob
+  for IMAGE in "$BASE_IMAGE_DIR"/*.img; do
+    IMAGE_NAME=${IMAGE##*/}
+    if [[ $LIST_ALL -eq 1 || $IMAGE_NAME == *base* ]]; then
+      printf '%s\n' "${IMAGE_NAME%.img}"
+    fi
+  done
+  exit 0
+fi
 
-if [ -z "$SOURCE_NAME" -o -z "$TARGET_NAME" ]; then
+if [[ -z "$SOURCE_NAME" || -z "$TARGET_NAME" ]]; then
   usage; exit 1
 fi
 
 # Check prerequisites
 for BINARY in getopt virsh qemu-img mkswap sed tail openssl hexdump perl virt-install; do
-  if ! type -p $BINARY >/dev/null ; then
+  if ! type -p "$BINARY" >/dev/null ; then
     echo "Please install '$BINARY' first to use snap-guest!" 1>&2
     echo "See https://github.com/lzap/snap-guest#installation" 1>&2
     exit 1
   fi
 done
 
-SOURCE_IMG=$(ls -v1 $BASE_IMAGE_DIR/${SOURCE_NAME}*.img | tail -n1)
+shopt -s nullglob
+SOURCE_IMAGES=("$BASE_IMAGE_DIR"/"$SOURCE_NAME"*.img)
+if [[ ${#SOURCE_IMAGES[@]} -gt 0 ]]; then
+  mapfile -t SOURCE_IMAGES < <(printf '%s\n' "${SOURCE_IMAGES[@]}" | sort -V)
+  SOURCE_IMG=${SOURCE_IMAGES[${#SOURCE_IMAGES[@]} - 1]}
+else
+  SOURCE_IMG=""
+fi
 TARGET_IMG=$IMAGE_DIR/$TARGET_NAME.img
 TARGET_IMG_SWAP=$IMAGE_DIR/$TARGET_NAME-swap.img
-MAC="52:54:00$(echo "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
+MAC="52:54:00$(printf '%s' "$(hostname)$TARGET_NAME" | openssl dgst -md5 -binary | hexdump -e '/1 ":%02x"' -n 3)"
 TARGET_HOSTNAME="$PREFIX$TARGET_NAME$DOMAIN"
 
 if [ ! -f "$SOURCE_IMG" ]; then
@@ -163,16 +178,21 @@ fi
 
 if [ -f "$TARGET_IMG" ]; then
   echo "Target image already exists!"
-  if [ $FORCE -eq 1 ]; then
+  if [[ $FORCE -eq 1 ]]; then
     REPLY="y"
   else
-    read -p "Shutdown and remove host with this name first (y/[n])? "
+    read -r -p "Shutdown and remove host with this name first (y/[n])? " REPLY
   fi
-  [ "$REPLY" != "y" ] && \
-    # need to do it twice (sometimes this fail)
-    virsh destroy "$TARGET_NAME" 2>/dev/null; sleep 2s; \
-    virsh destroy "$TARGET_NAME" 2>/dev/null; sleep 1s; \
-    virsh undefine "$TARGET_NAME"
+  if [[ $REPLY != "y" ]]; then
+    exit 1
+  fi
+  # Need to do it twice (sometimes this fails).
+  virsh destroy "$TARGET_NAME" 2>/dev/null || true
+  sleep 2s
+  virsh destroy "$TARGET_NAME" 2>/dev/null || true
+  sleep 1s
+  virsh undefine "$TARGET_NAME"
+  rm -f -- "$TARGET_IMG" "$TARGET_IMG_SWAP"
 fi
 
 echo "Creating snapshot guest $TARGET_NAME"
@@ -180,7 +200,7 @@ echo "Creating snapshot guest $TARGET_NAME"
 # -- Image Creation --------------
 
 echo "Creating snapshot image"
-qemu-img create -f qcow2 -b $SOURCE_IMG $TARGET_IMG
+qemu-img create -f qcow2 -b "$SOURCE_IMG" "$TARGET_IMG"
 
 # -- Image Manipulation ----------
 
@@ -190,12 +210,12 @@ perl -w "$SCRIPTDIR/prepare-image.pl"
 
 # -- Swap Creation --------------
 
-if [ $SWAP -gt 0 ]; then
-  qemu-img create -f raw $TARGET_IMG_SWAP ${SWAP}M
-  mkswap -f $TARGET_IMG_SWAP
-  DISK_SWAP="--disk $TARGET_IMG_SWAP,device=disk,bus=virtio,format=raw"
+if [[ $SWAP -gt 0 ]]; then
+  qemu-img create -f raw "$TARGET_IMG_SWAP" "${SWAP}M"
+  mkswap -f "$TARGET_IMG_SWAP"
+  DISK_SWAP=(--disk "$TARGET_IMG_SWAP,device=disk,bus=virtio,format=raw")
 else
-  DISK_SWAP=""
+  DISK_SWAP=()
 fi
 
 # -- Image Provisioning ---------
@@ -204,38 +224,44 @@ echo "Provisioning guest $TARGET_NAME"
 echo "Hostname: $TARGET_HOSTNAME"
 echo "CPUs:     $CPUS"
 echo "Memory:   $MEM MB"
-echo "Swap:     $MEM MB"
+echo "Swap:     $SWAP MB"
 echo "MAC:      $MAC"
-virt-install --vcpus $CPUS \
-  --ram $MEM --import \
-  --name $TARGET_NAME \
-  --disk $TARGET_IMG,device=disk,bus=virtio,format=qcow2 $DISK_SWAP \
-  --graphics "$GRAPHICS_OPTS" \
-  --noautoconsole --force \
-  --network=$NETWORK,mac=$MAC \
-  $NETWORK2 \
-  $CPU_FEATURE
+VIRT_INSTALL_ARGS=(
+  --vcpus "$CPUS"
+  --ram "$MEM"
+  --import
+  --name "$TARGET_NAME"
+  --disk "$TARGET_IMG,device=disk,bus=virtio,format=qcow2"
+  --graphics "$GRAPHICS_OPTS"
+  --noautoconsole
+  --force
+  "--network=$NETWORK,mac=$MAC"
+)
+VIRT_INSTALL_ARGS+=("${DISK_SWAP[@]}" "${NETWORK2[@]}" "${CPU_FEATURE[@]}")
+virt-install "${VIRT_INSTALL_ARGS[@]}"
 
 # -- IP Determining -------------
 # TODO: Use this instead: http://rwmj.wordpress.com/2010/10/26/tip-find-the-ip-address-of-a-virtual-machine/
 
-if [ $ADD_IP -eq 1 ]; then
+if [[ $ADD_IP -eq 1 ]]; then
   echo "Waiting for IP"
   i=0
-  until [ $i -ge 100 ] || IP_LINE=`cat /var/lib/libvirt/dnsmasq/${NETWORK/network=}.leases /var/lib/dnsmasq/dnsmasq.leases 2>/dev/null | grep "$MAC"`; do
+  until [[ $i -ge 100 ]] || IP_LINE=$(grep -h -- "$MAC" \
+    "/var/lib/libvirt/dnsmasq/${NETWORK#network=}.leases" \
+    /var/lib/dnsmasq/dnsmasq.leases 2>/dev/null); do
     i=$((i + 1))
     sleep 1
   done
 
   if [[ -n $IP_LINE ]]; then
-    IP=`echo  $IP_LINE | awk '{print $3}'`
+    IP=$(awk '{print $3}' <<<"$IP_LINE")
     if ! grep -q "$TARGET_HOSTNAME\$" /etc/hosts; then
       echo "Writing into /etc/hosts ip: $IP"
       echo "$IP $TARGET_HOSTNAME $TARGET_NAME" >> /etc/hosts
     else
       echo "Host $TARGET_HOSTNAME already in hosts"
-      OLD_IP=`grep "$TARGET_HOSTNAME\$" /etc/hosts | head -n 1 | awk '{print $1}'`
-      if [[ $IP = $OLD_IP ]]; then
+      OLD_IP=$(grep "$TARGET_HOSTNAME\$" /etc/hosts | head -n 1 | awk '{print $1}')
+      if [[ $IP == "$OLD_IP" ]]; then
         echo "and these ip's match"
       else
         echo "with different ip: $OLD_IP instead of $IP"
