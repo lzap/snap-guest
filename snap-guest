@@ -36,8 +36,6 @@ OPTIONS:
         Domain prefix like "test-" -> "test-NAME.lan" (default: none)
   --force | -f
         Force creating new guest (destroy existing, no questions, DANGEROUS!)
-  --add-ip | -w
-        Add IP address to /etc/hosts on the host machine (works only with NAT)
   --graphics [opts] | -g [opts]
         Graphics options passed to virt-install via --graphics
         (default is vnc,listen=0.0.0.0)
@@ -89,7 +87,6 @@ PREFIX=""
 FORCE=0
 LIST=0
 LIST_ALL=0
-ADD_IP=0
 GRAPHICS_OPTS="vnc,listen=0.0.0.0"
 COMMAND=""
 STATIC_IPADDR=""
@@ -97,7 +94,7 @@ STATIC_NETMASK=""
 STATIC_GATEWAY=""
 CPU_FEATURE=()
 
-if ! options=$(getopt -o hlfwb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,add-ip,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,static-ipaddr:,static-netmask:,static-gateway:,cpu-feature:,help -- "$@"); then
+if ! options=$(getopt -o hlfb:t:n:m:c:d:p:s:1:g: -l list,list-all,force,image-dir:,base-image-dir:,base:,graphics:,target:,network:,network2:,memory:,cpus:,domain:,domain-prefix:,swap:,firstboot:,static-ipaddr:,static-netmask:,static-gateway:,cpu-feature:,help -- "$@"); then
   exit 1
 fi
 
@@ -108,7 +105,6 @@ while [ $# -gt 0 ]; do
     --list|-l) LIST=1 ;;
     --list-all) LIST_ALL=1 ;;
     --force|-f) FORCE=1 ;;
-    --add-ip|-w) ADD_IP=1 ;;
     --image-dir|-p) IMAGE_DIR="$2" ; shift ;;
     --base-image-dir) BASE_IMAGE_DIR="$2" ; shift ;;
     --base|-b) SOURCE_NAME="$2" ; shift ;;
@@ -151,7 +147,7 @@ if [[ -z "$SOURCE_NAME" || -z "$TARGET_NAME" ]]; then
 fi
 
 # Check prerequisites
-for BINARY in getopt virsh qemu-img mkswap sed tail openssl hexdump perl virt-install; do
+for BINARY in getopt virsh qemu-img mkswap openssl hexdump perl sort virt-install; do
   if ! type -p "$BINARY" >/dev/null ; then
     echo "Please install '$BINARY' first to use snap-guest!" 1>&2
     echo "See https://github.com/lzap/snap-guest#installation" 1>&2
@@ -241,35 +237,5 @@ VIRT_INSTALL_ARGS=(
 )
 VIRT_INSTALL_ARGS+=("${DISK_SWAP[@]}" "${NETWORK2[@]}" "${CPU_FEATURE[@]}")
 virt-install "${VIRT_INSTALL_ARGS[@]}"
-
-# -- IP Determining -------------
-# TODO: Use this instead: http://rwmj.wordpress.com/2010/10/26/tip-find-the-ip-address-of-a-virtual-machine/
-
-if [[ $ADD_IP -eq 1 ]]; then
-  echo "Waiting for IP"
-  i=0
-  until [[ $i -ge 100 ]] || IP_LINE=$(grep -h -- "$MAC" \
-    "/var/lib/libvirt/dnsmasq/${NETWORK#network=}.leases" \
-    /var/lib/dnsmasq/dnsmasq.leases 2>/dev/null); do
-    i=$((i + 1))
-    sleep 1
-  done
-
-  if [[ -n $IP_LINE ]]; then
-    IP=$(awk '{print $3}' <<<"$IP_LINE")
-    if ! grep -q "$TARGET_HOSTNAME\$" /etc/hosts; then
-      echo "Writing into /etc/hosts ip: $IP"
-      echo "$IP $TARGET_HOSTNAME $TARGET_NAME" >> /etc/hosts
-    else
-      echo "Host $TARGET_HOSTNAME already in hosts"
-      OLD_IP=$(grep "$TARGET_HOSTNAME\$" /etc/hosts | head -n 1 | awk '{print $1}')
-      if [[ $IP == "$OLD_IP" ]]; then
-        echo "and these ip's match"
-      else
-        echo "with different ip: $OLD_IP instead of $IP"
-      fi
-    fi
-  fi
-fi
 
 # -- EOF --

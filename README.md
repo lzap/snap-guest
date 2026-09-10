@@ -123,8 +123,6 @@ Here you can find all parameters:
             Domain prefix like "test-" -> "test-NAME.lan" (default: none)
       --force | -f
             Force creating new guest (no questions, destroys one the same name)
-      --add-ip | -w
-            Add IP address to /etc/hosts (works only with NAT)
       --graphics [opts] | -g [opts]
             Graphics options passed to virt-install via --graphics
             (default is vnc,listen=0.0.0.0)
@@ -153,18 +151,13 @@ Network
 -------
 
 The script modifies network settings in /etc/sysconfig directory (hostname and
-MAC address of the eth0). The MAC address is generated based on the hostname -
-the same hostname always gives the same address. Example:
+MAC address of the eth0). The MAC address is generated from the KVM host name
+and target name, so recreating a target on the same KVM host gives it the same
+MAC address.
 
-    hostname a => mac 52:54:00:60:b7:25
-    hostname b => mac 52:54:00:3b:5d:5c
-    hostname a => mac 52:54:00:60:b7:25 (the same)
-
-This is great for testing - when you provision a box called let's say "test"
-and delete it, once it is provisioned again with the same name, DHCP will
-assign it the very same IP address. You can keep hostnames and IPs in the
-/etc/hosts file and if you won't be shut down your guests for longer periods,
-IPs never change.
+This is great for testing: when you provision a box called "test", delete it,
+and provision it again, DHCP assigns it the same MAC address and therefore
+usually the same IP address.
 
 It is also possible to provision guests with static network settings. It is
 currently available for Fedora and Red Hats. Example options:
@@ -174,9 +167,24 @@ currently available for Fedora and Red Hats. Example options:
         --static-netmask 255.255.255.0 \
         --static-gateway 192.168.100.1
 
-Additionally, if you use snap-guest on the same host where KVM is running,
-there is a flag that adds entries to your /etc/hosts automatically. See help
-section for more details.
+## DNS with libvirt
+
+Set a domain on the libvirt network so that libvirt configures dnsmasq for
+guest name resolution. The `--domain` option gives a guest its fully-qualified
+hostname; it does not configure the libvirt network domain.
+
+    virsh net-edit default
+
+Ensure the network XML contains the desired domain, then restart the network:
+
+    <network>
+      <domain name='example.com'/>
+    </network>
+
+    virsh net-stop default
+    virsh net-start default
+
+Guests on that network can then resolve each other as `name.example.com`.
 
 ## Credits and license
 
