@@ -116,6 +116,10 @@ recreating the same target uses the same MAC address and forwarding ports. Run
 existing user-session domain of the target name and remove its target overlay
 before creating a fresh test VM.
 
+The `--unsafe` option enables unsafe disk caching and is intended only for
+development and testing. It may ignore flush requests from the guest and can
+cause data loss if the host fails.
+
 ## Credits and license
 
 This project is distributed as public domain.

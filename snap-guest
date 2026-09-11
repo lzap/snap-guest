@@ -46,6 +46,8 @@ OPTIONS:
         CPU model and features passed to virt-install via --cpu
   --osinfo [name]
         Operating system identifier passed to virt-install (default: fedora-rawhide)
+  --unsafe
+        Use unsafe disk caching (development and testing only)
   --force | -f
         Replace an existing user-session guest and target overlay image
 
@@ -195,7 +197,7 @@ SSH_OPTIONS=(
   -o LogLevel=ERROR
 )
 
-if ! options=$(getopt -o hlfb:t:m:c:p:g: -l list,list-all,force,bind-all,image-dir:,base-image-dir:,base:,graphics:,target:,memory:,cpus:,ssh-user:,ports:,cpu-feature:,osinfo:,help -- "$@"); then
+if ! options=$(getopt -o hlfb:t:m:c:p:g: -l list,list-all,force,bind-all,unsafe,image-dir:,base-image-dir:,base:,graphics:,target:,memory:,cpus:,ssh-user:,ports:,cpu-feature:,osinfo:,help -- "$@"); then
   exit 1
 fi
 
@@ -216,6 +218,7 @@ while [[ $# -gt 0 ]]; do
     --ssh-user) SSH_USER=$2; shift ;;
     --ports) PORTS_TEXT=$2; shift ;;
     --bind-all) BIND_ALL=1 ;;
+    --unsafe) UNSAFE=1 ;;
     --cpu-feature) CPU_FEATURE=("--cpu=$2"); shift ;;
     --osinfo) OSINFO=$2; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -331,7 +334,7 @@ VIRT_INSTALL_ARGS=(
   --import
   --osinfo "$OSINFO"
   --name "$TARGET_NAME"
-  --disk "$TARGET_IMG,device=disk,bus=virtio,format=qcow2"
+  --disk "$TARGET_IMG,device=disk,bus=virtio,format=qcow2${UNSAFE:+,cache=unsafe}"
   --graphics "$GRAPHICS_OPTS"
   --noautoconsole
   --force
