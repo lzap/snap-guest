@@ -27,6 +27,10 @@ forwarded port:
 
     ssh root@foreman.example.com
 
+For a fully-qualified target such as `foreman.example.com`, both
+`foreman` and `foreman.example.com` are available as SSH aliases. The user
+selected with `--ssh-user` is configured for both aliases.
+
 ## Base-image contract
 
 The base image must be a `.qcow2` file and must already contain:

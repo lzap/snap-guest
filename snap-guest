@@ -44,6 +44,8 @@ OPTIONS:
         (default: vnc,listen=127.0.0.1)
   --cpu-feature [opts]
         CPU model and features passed to virt-install via --cpu
+  --osinfo [name]
+        Operating system identifier passed to virt-install (default: fedora-rawhide)
   --force | -f
         Replace an existing user-session guest and target overlay image
 
@@ -125,6 +127,13 @@ update_ssh_config() {
   local ssh_dir="$HOME/.ssh"
   local snap_config="$ssh_dir/config-snap-guest"
   local temp_config
+  local host_aliases="$TARGET_NAME"
+  local short_target
+
+  if [[ $TARGET_NAME == *.* ]]; then
+    short_target=${TARGET_NAME%%.*}
+    host_aliases="$short_target $TARGET_NAME"
+  fi
 
   mkdir -p "$ssh_dir" || die "Unable to create '$ssh_dir'."
   chmod 700 "$ssh_dir" || die "Unable to set permissions on '$ssh_dir'."
@@ -142,7 +151,7 @@ update_ssh_config() {
   }
   {
     printf '\n# BEGIN snap-guest %s\n' "$TARGET_NAME"
-    printf 'Host %s\n' "$TARGET_NAME"
+    printf 'Host %s\n' "$host_aliases"
     printf '  HostName 127.0.0.1\n'
     printf '  Port %s\n' "$SSH_PORT"
     printf '  User %s\n' "$SSH_USER"
@@ -170,6 +179,7 @@ LIST=0
 LIST_ALL=0
 GRAPHICS_OPTS="vnc,listen=127.0.0.1"
 CPU_FEATURE=()
+OSINFO="fedora-rawhide"
 LIBVIRT_URI="qemu:///session"
 HOST_NAME=$(hostname)
 FORWARD_HOST="127.0.0.1"
@@ -185,7 +195,7 @@ SSH_OPTIONS=(
   -o LogLevel=ERROR
 )
 
-if ! options=$(getopt -o hlfb:t:m:c:p:g: -l list,list-all,force,bind-all,image-dir:,base-image-dir:,base:,graphics:,target:,memory:,cpus:,ssh-user:,ports:,cpu-feature:,help -- "$@"); then
+if ! options=$(getopt -o hlfb:t:m:c:p:g: -l list,list-all,force,bind-all,image-dir:,base-image-dir:,base:,graphics:,target:,memory:,cpus:,ssh-user:,ports:,cpu-feature:,osinfo:,help -- "$@"); then
   exit 1
 fi
 
@@ -207,6 +217,7 @@ while [[ $# -gt 0 ]]; do
     --ports) PORTS_TEXT=$2; shift ;;
     --bind-all) BIND_ALL=1 ;;
     --cpu-feature) CPU_FEATURE=("--cpu=$2"); shift ;;
+    --osinfo) OSINFO=$2; shift ;;
     --help|-h) usage; exit 0 ;;
     --) shift; break ;;
     *) die "$0: error - unrecognized option $1" ;;
@@ -318,7 +329,7 @@ VIRT_INSTALL_ARGS=(
   --vcpus "$CPUS"
   --ram "$MEM"
   --import
-  --osinfo "detect=on,require=off"
+  --osinfo "$OSINFO"
   --name "$TARGET_NAME"
   --disk "$TARGET_IMG,device=disk,bus=virtio,format=qcow2"
   --graphics "$GRAPHICS_OPTS"
