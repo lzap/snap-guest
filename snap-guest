@@ -376,9 +376,15 @@ write_motd() {
 }
 
 if [ "$(id -u)" -eq 0 ]; then
+  if [ -f /etc/yum.repos.d/download.devel.redhat.com.repo ]; then
+    rm -f /etc/yum.repos.d/download.devel.redhat.com.repo
+  fi
   hostnamectl set-hostname "$target_name"
   write_motd "$@" > /etc/motd
 else
+  if [ -f /etc/yum.repos.d/download.devel.redhat.com.repo ]; then
+    sudo -n rm -f /etc/yum.repos.d/download.devel.redhat.com.repo
+  fi
   sudo -n hostnamectl set-hostname "$target_name"
   write_motd "$@" | sudo -n tee /etc/motd >/dev/null
 fi
