@@ -375,6 +375,24 @@ write_motd() {
   done
 }
 
+write_loopback_hosts_entry() {
+  hosts_line="127.0.0.1 $target_name"
+  if case "$target_name" in *.*) true ;; *) false ;; esac; then
+    short_name=${target_name%%.*}
+    hosts_line="$hosts_line $short_name"
+  fi
+
+  hosts_content=$(printf '%s\n%s\n%s\n' \
+    "$hosts_line" \
+    '127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4' \
+    '::1         localhost localhost.localdomain localhost6 localhost6.localdomain6')
+  if [ "$(id -u)" -eq 0 ]; then
+    printf '%s\n' "$hosts_content" > /etc/hosts
+  else
+    printf '%s\n' "$hosts_content" | sudo -n tee /etc/hosts >/dev/null
+  fi
+}
+
 if [ "$(id -u)" -eq 0 ]; then
   if [ -f /etc/yum.repos.d/download.devel.redhat.com.repo ]; then
     rm -f /etc/yum.repos.d/download.devel.redhat.com.repo
@@ -388,6 +406,7 @@ else
   sudo -n hostnamectl set-hostname "$target_name"
   write_motd "$@" | sudo -n tee /etc/motd >/dev/null
 fi
+write_loopback_hosts_entry
 REMOTE
   die "Unable to set the hostname. '$SSH_USER' must be root or have passwordless sudo in the base image."
 fi

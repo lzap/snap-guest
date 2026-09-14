@@ -41,8 +41,12 @@ The base image must be a `.qcow2` file and must already contain:
 * passwordless `sudo` for that user, unless it is `root`;
 * `systemd` with `hostnamectl` and `systemctl` available.
 
-The target name is also the hostname. A fully-qualified target name is allowed,
-but rootless user-mode networking does not provide shared guest DNS.
+The target name is also the hostname. A fully-qualified target name is allowed.
+After setting the hostname, snap-guest rewrites the guest's `/etc/hosts` with a
+loopback entry first; for `foreman.example.com`, the entry is
+`127.0.0.1 foreman.example.com foreman`, followed by standard IPv4 and IPv6
+localhost entries. This makes the guest's own FQDN resolve locally even though
+rootless user-mode networking does not provide shared guest DNS.
 
 ## Installation
 
