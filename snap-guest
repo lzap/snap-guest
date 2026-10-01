@@ -333,6 +333,7 @@ VIRT_INSTALL_ARGS=(
   --ram "$MEM"
   --import
   --osinfo "$OSINFO"
+  --machine pc
   --name "$TARGET_NAME"
   --disk "$TARGET_IMG,device=disk,bus=virtio,format=qcow2${UNSAFE:+,cache=unsafe}"
   --graphics "$GRAPHICS_OPTS"
